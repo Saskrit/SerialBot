@@ -96,7 +96,7 @@ def build_status_text(user: dict, *, is_admin: bool = False) -> str:
         )
 
     if is_admin:
-        lines.append("\n🛠 <b>Admin:</b> send /admin")
+        lines.append("\n🛠 <b>Admin:</b> /admin in Telegram · web panel at <code>/admin</code>")
 
     return "\n".join(lines)
 
@@ -149,7 +149,7 @@ def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
     )
 
     if is_admin:
-        lines.append("\n🛠 <b>Admin:</b> send /admin to open the panel.")
+        lines.append("\n🛠 <b>Admin:</b> /admin in Telegram · web panel at <code>/admin</code>")
 
     return "\n".join(lines)
 

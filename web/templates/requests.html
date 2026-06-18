@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Episode requests — Serial Hub Admin{% endblock %}
+{% block content %}
+<h1>Open episode requests</h1>
+{% if not requests %}
+<p class="muted">No open requests.</p>
+{% else %}
+<table>
+  <thead>
+    <tr><th>Serial</th><th>Date</th><th>User</th><th>Submitted</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for req in requests %}
+    <tr>
+      <td>{{ req.serial_name }}</td>
+      <td>{{ req.episode_date }}</td>
+      <td><a href="/admin/users/{{ req.user_id }}">{{ req.user_id }}</a></td>
+      <td>{{ format_datetime(req.created_at) }}</td>
+      <td>
+        <form method="post" action="/admin/requests/{{ req._id }}/close">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn-ghost">Close</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

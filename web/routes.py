@@ -1,0 +1,466 @@
+import logging
+from pathlib import Path
+from urllib.parse import quote
+
+from aiohttp import web
+from bson import ObjectId
+
+import aiohttp
+
+from database import repository as repo
+from database.connection import get_db
+from services import admin_actions
+from services.messages import format_date, format_datetime
+from web.auth import (
+    clear_session_cookies,
+    get_admin_id,
+    require_admin,
+    set_session_cookies,
+    template_context,
+    verify_csrf,
+    verify_login,
+    web_admin_enabled,
+)
+from web.templates import render_template
+
+logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+USERS_PER_PAGE = 15
+EPISODES_PER_PAGE = 8
+
+
+def _html(name: str, request: web.Request, status: int = 200, **ctx) -> web.Response:
+    body = render_template(name, **template_context(request, **ctx))
+    return web.Response(text=body, content_type="text/html", status=status)
+
+
+def _redirect(path: str, msg: str | None = None) -> None:
+    if msg:
+        sep = "&" if "?" in path else "?"
+        path = f"{path}{sep}msg={quote(msg)}"
+    raise web.HTTPFound(path)
+
+
+def _flash_from_query(request: web.Request) -> str | None:
+    return request.rel_url.query.get("msg")
+
+
+def _create_bot(request: web.Request):
+    return request.app["create_bot"]()
+
+
+async def login_page(request: web.Request) -> web.Response:
+    if get_admin_id(request) is not None:
+        raise web.HTTPFound("/admin/")
+    error = request.rel_url.query.get("error")
+    return _html("login.html", request, error=error)
+
+
+async def login_submit(request: web.Request) -> web.Response:
+    if not web_admin_enabled():
+        return _html("login.html", request, error="Web admin is not configured.", status=503)
+
+    post = await request.post()
+    raw_id = str(post.get("telegram_id", "")).strip()
+    password = str(post.get("password", ""))
+
+    if not raw_id.isdigit():
+        raise web.HTTPFound("/admin/login?error=Invalid+Telegram+ID")
+    if not verify_login(int(raw_id), password):
+        raise web.HTTPFound("/admin/login?error=Invalid+credentials")
+
+    response = web.HTTPFound("/admin/")
+    set_session_cookies(response, int(raw_id))
+    return response
+
+
+async def logout(request: web.Request) -> web.Response:
+    if request.method == "POST" and not await verify_csrf(request):
+        raise web.HTTPForbidden(text="Invalid CSRF token")
+    response = web.HTTPFound("/admin/login")
+    clear_session_cookies(response)
+    return response
+
+
+@require_admin
+async def dashboard(request: web.Request) -> web.Response:
+    stats = await repo.get_user_stats()
+    episode_count = await get_db().episodes.count_documents({})
+    pending = await get_db().payments.count_documents(
+        {"status": "pending", "screenshot_file_id": {"$ne": None}}
+    )
+    open_requests = await get_db().episode_requests.count_documents({"status": "open"})
+    open_tickets = await get_db().support_tickets.count_documents({"status": "open"})
+    return _html(
+        "dashboard.html",
+        request,
+        flash=_flash_from_query(request),
+        stats=stats,
+        episode_count=episode_count,
+        pending=pending,
+        open_requests=open_requests,
+        open_tickets=open_tickets,
+        format_date=format_date,
+    )
+
+
+@require_admin
+async def users_list(request: web.Request) -> web.Response:
+    page = max(0, int(request.rel_url.query.get("page", "0")))
+    search = request.rel_url.query.get("q", "").strip()
+
+    if search.isdigit():
+        user = await repo.get_user(int(search))
+        users = [user] if user else []
+        total = len(users)
+        total_pages = 1
+        page = 0
+    else:
+        users, total = await repo.list_users(page, USERS_PER_PAGE)
+        total_pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+
+    return _html(
+        "users.html",
+        request,
+        flash=_flash_from_query(request),
+        users=users,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        search=search,
+        format_date=format_date,
+    )
+
+
+@require_admin
+async def user_detail(request: web.Request) -> web.Response:
+    telegram_id = int(request.match_info["telegram_id"])
+    user = await repo.get_user(telegram_id)
+    if not user:
+        raise web.HTTPFound("/admin/users?msg=User+not+found")
+    return _html(
+        "user_detail.html",
+        request,
+        flash=_flash_from_query(request),
+        user=user,
+        format_date=format_date,
+        format_datetime=format_datetime,
+    )
+
+
+async def _post_action(request: web.Request, handler) -> web.Response:
+    if not await verify_csrf(request):
+        raise web.HTTPForbidden(text="Invalid CSRF token")
+    return await handler(request)
+
+
+@require_admin
+async def user_ban(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        await repo.set_banned(telegram_id, True)
+        _redirect(f"/admin/users/{telegram_id}", "User banned.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def user_unban(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        await repo.set_banned(telegram_id, False)
+        _redirect(f"/admin/users/{telegram_id}", "User unbanned.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def user_grant_vip(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        post = await req.post()
+        days_raw = str(post.get("days", "30")).strip()
+        days = int(days_raw) if days_raw.isdigit() else 30
+        bot = _create_bot(req)
+        try:
+            expires = await admin_actions.grant_vip_with_notify(bot, telegram_id, days)
+        finally:
+            await bot.session.close()
+        _redirect(f"/admin/users/{telegram_id}", f"VIP granted until {format_date(expires)}.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def user_delete(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        await repo.delete_user(telegram_id)
+        _redirect("/admin/users", "User deleted.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def payments_list(request: web.Request) -> web.Response:
+    payments = await repo.get_pending_payments(50)
+    return _html(
+        "payments.html",
+        request,
+        flash=_flash_from_query(request),
+        payments=payments,
+        format_datetime=format_datetime,
+    )
+
+
+@require_admin
+async def payment_screenshot(request: web.Request) -> web.Response:
+    payment_id = request.match_info["payment_id"]
+    payment = await repo.get_payment(payment_id)
+    if not payment or not payment.get("screenshot_file_id"):
+        raise web.HTTPNotFound()
+
+    bot = _create_bot(request)
+    try:
+        url = await admin_actions.get_telegram_file_url(bot, payment["screenshot_file_id"])
+    finally:
+        await bot.session.close()
+
+    if not url:
+        raise web.HTTPNotFound(text="Screenshot unavailable")
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status != 200:
+                raise web.HTTPNotFound(text="Screenshot unavailable")
+            body = await resp.read()
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
+            return web.Response(body=body, content_type=content_type)
+
+
+@require_admin
+async def payment_approve(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        payment_id = req.match_info["payment_id"]
+        bot = _create_bot(req)
+        try:
+            ok, msg = await admin_actions.approve_payment(
+                bot, payment_id, req["admin_id"]
+            )
+        finally:
+            await bot.session.close()
+        _redirect("/admin/payments", msg if ok else f"Error: {msg}")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def payment_reject(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        payment_id = req.match_info["payment_id"]
+        bot = _create_bot(req)
+        try:
+            ok, msg = await admin_actions.reject_payment(
+                bot, payment_id, req["admin_id"]
+            )
+        finally:
+            await bot.session.close()
+        _redirect("/admin/payments", msg if ok else f"Error: {msg}")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def episodes_index(request: web.Request) -> web.Response:
+    slug = request.rel_url.query.get("slug", "").strip().lower().replace(" ", "-")
+    page = max(0, int(request.rel_url.query.get("page", "0")))
+    serials = await repo.list_serials()
+
+    serial = None
+    episodes = []
+    total = 0
+    total_pages = 1
+
+    if slug:
+        serial = await repo.get_serial_by_slug(slug)
+        if serial:
+            episodes, total = await repo.get_episodes(slug, page, EPISODES_PER_PAGE)
+            total_pages = max(1, (total + EPISODES_PER_PAGE - 1) // EPISODES_PER_PAGE)
+
+    return _html(
+        "episodes.html",
+        request,
+        flash=_flash_from_query(request),
+        serials=serials,
+        serial=serial,
+        slug=slug,
+        episodes=episodes,
+        page=page,
+        total=total,
+        total_pages=total_pages,
+        format_date=format_date,
+    )
+
+
+@require_admin
+async def episode_delete_confirm(request: web.Request) -> web.Response:
+    episode_id = request.match_info["episode_id"]
+    if not ObjectId.is_valid(episode_id):
+        raise web.HTTPNotFound()
+    episode = await repo.get_episode(episode_id)
+    if not episode:
+        raise web.HTTPFound("/admin/episodes?msg=Episode+not+found")
+
+    slug = request.rel_url.query.get("slug", episode.get("serial_slug", ""))
+    page = request.rel_url.query.get("page", "0")
+    return _html(
+        "episode_delete.html",
+        request,
+        episode=episode,
+        episode_id=episode_id,
+        slug=slug,
+        page=page,
+        format_date=format_date,
+    )
+
+
+@require_admin
+async def episode_delete(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        episode_id = req.match_info["episode_id"]
+        episode = await repo.delete_episode(episode_id)
+        slug = str((await req.post()).get("slug", "")).strip()
+        if episode:
+            slug = slug or episode.get("serial_slug", "")
+            name = episode.get("serial_name", "")
+            date_label = format_date(episode["date"])
+            msg = f"Deleted {name} — {date_label}."
+        else:
+            msg = "Episode not found."
+        dest = f"/admin/episodes?slug={quote(slug)}" if slug else "/admin/episodes"
+        _redirect(dest, msg)
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def requests_list(request: web.Request) -> web.Response:
+    requests_list_data = await repo.get_open_episode_requests(100)
+    return _html(
+        "requests.html",
+        request,
+        flash=_flash_from_query(request),
+        requests=requests_list_data,
+        format_datetime=format_datetime,
+    )
+
+
+@require_admin
+async def request_close(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        request_id = req.match_info["request_id"]
+        ok = await repo.close_episode_request(request_id)
+        msg = "Request closed." if ok else "Request not found or already closed."
+        _redirect("/admin/requests", msg)
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def support_list(request: web.Request) -> web.Response:
+    tickets = await repo.get_open_support_tickets(100)
+    return _html(
+        "support.html",
+        request,
+        flash=_flash_from_query(request),
+        tickets=tickets,
+        format_datetime=format_datetime,
+    )
+
+
+@require_admin
+async def support_reply(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        ticket_id = req.match_info["ticket_id"]
+        post = await req.post()
+        reply_text = str(post.get("reply", "")).strip()
+        if not reply_text:
+            _redirect("/admin/support", "Reply cannot be empty.")
+        bot = _create_bot(req)
+        try:
+            ok, msg = await admin_actions.reply_support_ticket(
+                bot, ticket_id, reply_text, req["admin_id"]
+            )
+        finally:
+            await bot.session.close()
+        _redirect("/admin/support", msg if ok else f"Error: {msg}")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def broadcast_page(request: web.Request) -> web.Response:
+    return _html("broadcast.html", request, flash=_flash_from_query(request))
+
+
+@require_admin
+async def broadcast_send(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        post = await req.post()
+        message = str(post.get("message", "")).strip()
+        if not message:
+            _redirect("/admin/broadcast", "Message cannot be empty.")
+        bot = _create_bot(req)
+        try:
+            sent, total = await admin_actions.broadcast_message(bot, message)
+        finally:
+            await bot.session.close()
+        _redirect("/admin/broadcast", f"Broadcast sent to {sent}/{total} users.")
+
+    return await _post_action(request, action)
+
+
+async def static_file(request: web.Request) -> web.Response:
+    name = request.match_info["path"]
+    if ".." in name or name.startswith("/"):
+        raise web.HTTPNotFound()
+    path = STATIC_DIR / name
+    if not path.is_file():
+        raise web.HTTPNotFound()
+    content_type = "text/css" if name.endswith(".css") else "application/octet-stream"
+    return web.FileResponse(path, headers={"Content-Type": content_type})
+
+
+def setup_admin_routes(app: web.Application, create_bot) -> None:
+    if not web_admin_enabled():
+        logger.warning("Web admin disabled — set ADMIN_SECRET and ADMIN_IDS to enable /admin")
+        return
+
+    app["create_bot"] = create_bot
+    app.router.add_get("/admin/login", login_page)
+    app.router.add_post("/admin/login", login_submit)
+    app.router.add_post("/admin/logout", logout)
+    app.router.add_get("/admin/logout", logout)
+    app.router.add_get("/admin/", dashboard)
+    app.router.add_get("/admin/users", users_list)
+    app.router.add_get("/admin/users/{telegram_id:\\d+}", user_detail)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/ban", user_ban)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/unban", user_unban)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/vip", user_grant_vip)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/delete", user_delete)
+    app.router.add_get("/admin/payments", payments_list)
+    app.router.add_get("/admin/payments/{payment_id}/screenshot", payment_screenshot)
+    app.router.add_post("/admin/payments/{payment_id}/approve", payment_approve)
+    app.router.add_post("/admin/payments/{payment_id}/reject", payment_reject)
+    app.router.add_get("/admin/episodes", episodes_index)
+    app.router.add_get("/admin/episodes/delete/{episode_id}", episode_delete_confirm)
+    app.router.add_post("/admin/episodes/delete/{episode_id}", episode_delete)
+    app.router.add_get("/admin/requests", requests_list)
+    app.router.add_post("/admin/requests/{request_id}/close", request_close)
+    app.router.add_get("/admin/support", support_list)
+    app.router.add_post("/admin/support/{ticket_id}/reply", support_reply)
+    app.router.add_get("/admin/broadcast", broadcast_page)
+    app.router.add_post("/admin/broadcast", broadcast_send)
+    app.router.add_get("/admin/static/{path:.+}", static_file)
+    logger.info("Web admin panel enabled at /admin")

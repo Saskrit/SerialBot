@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Support — Serial Hub Admin{% endblock %}
+{% block content %}
+<h1>Open support tickets</h1>
+{% if not tickets %}
+<p class="muted">No open tickets.</p>
+{% else %}
+{% for ticket in tickets %}
+<div class="card ticket-card">
+  <div class="ticket-meta">
+    <span class="badge">{{ ticket.category }}</span>
+    <span class="muted">User <a href="/admin/users/{{ ticket.user_id }}">{{ ticket.user_id }}</a></span>
+    <span class="muted">{{ format_datetime(ticket.created_at) }}</span>
+  </div>
+  <p class="ticket-message">{{ ticket.message }}</p>
+  <form method="post" action="/admin/support/{{ ticket._id }}/reply" class="reply-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <textarea name="reply" rows="3" placeholder="Reply to user (closes ticket)" required></textarea>
+    <button type="submit" class="btn btn-primary">Send reply</button>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

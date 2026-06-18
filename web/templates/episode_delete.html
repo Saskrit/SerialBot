@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Delete episode — Serial Hub Admin{% endblock %}
+{% block content %}
+<p><a href="/admin/episodes?slug={{ slug }}&page={{ page }}">← Back to episodes</a></p>
+<h1>Delete episode?</h1>
+<div class="card">
+  <p><strong>Serial:</strong> {{ episode.serial_name }}</p>
+  <p><strong>Date:</strong> {{ format_date(episode.date) }}</p>
+  <p><strong>ID:</strong> <code>{{ episode_id }}</code></p>
+</div>
+<form method="post" action="/admin/episodes/delete/{{ episode_id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="slug" value="{{ slug }}">
+  <button type="submit" class="btn btn-danger">Confirm delete</button>
+  <a href="/admin/episodes?slug={{ slug }}&page={{ page }}" class="btn">Cancel</a>
+</form>
+{% endblock %}

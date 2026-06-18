@@ -21,6 +21,7 @@ from keyboards.inline import (
 from services.messages import format_date
 from services.episode_upload import save_episode_from_addepisode, save_episode_from_message
 from services.upload_parser import parse_episode_date
+from services import admin_actions
 from states import AdminStates
 
 logger = logging.getLogger(__name__)
@@ -299,7 +300,8 @@ async def admin_panel(message: Message):
     if not is_admin(message.from_user.id):
         return
     await message.answer(
-        "🛠 <b>Admin Panel</b>",
+        "🛠 <b>Admin Panel</b>\n\n"
+        "Web dashboard: open <code>/admin</code> on your Railway app URL.",
         reply_markup=admin_menu_keyboard(),
         parse_mode="HTML",
     )
@@ -440,31 +442,15 @@ async def approve_payment(callback: CallbackQuery):
         return
 
     payment_id = callback.data.split(":", 3)[3]
-    payment = await repo.review_payment(payment_id, True, callback.from_user.id)
-    if not payment:
-        await callback.answer("Payment not found or already reviewed.", show_alert=True)
+    ok, msg = await admin_actions.approve_payment(
+        callback.bot, payment_id, callback.from_user.id
+    )
+    if not ok:
+        await callback.answer(msg, show_alert=True)
         return
 
-    user_id = payment["user_id"]
-    if payment["type"] == "vip":
-        expires = await repo.grant_vip(user_id)
-        await callback.bot.send_message(
-            user_id,
-            "⭐ <b>You are now a VIP Member!</b>\n\n"
-            f"Unlimited episodes until <b>{format_date(expires)}</b>.",
-            parse_mode="HTML",
-        )
-    elif payment["type"] == "unlock" and payment.get("episode_id"):
-        await repo.grant_episode_unlock(user_id, payment["episode_id"])
-        await callback.bot.send_message(
-            user_id,
-            "🔓 <b>Episode unlocked!</b>\n"
-            "You can now watch it without using your daily limit.",
-            parse_mode="HTML",
-        )
-
     await callback.message.edit_caption(
-        callback.message.caption + "\n\n✅ Approved",
+        (callback.message.caption or "") + "\n\n✅ Approved",
         parse_mode="HTML",
     )
     await callback.answer("Approved ✅")
@@ -477,16 +463,13 @@ async def reject_payment(callback: CallbackQuery):
         return
 
     payment_id = callback.data.split(":", 3)[3]
-    payment = await repo.review_payment(payment_id, False, callback.from_user.id)
-    if not payment:
-        await callback.answer("Payment not found or already reviewed.", show_alert=True)
+    ok, msg = await admin_actions.reject_payment(
+        callback.bot, payment_id, callback.from_user.id
+    )
+    if not ok:
+        await callback.answer(msg, show_alert=True)
         return
 
-    await callback.bot.send_message(
-        payment["user_id"],
-        "❌ Your payment was not approved.\n"
-        "Contact support if you believe this is an error.",
-    )
     await callback.message.edit_caption(
         (callback.message.caption or "") + "\n\n❌ Rejected",
         parse_mode="HTML",
@@ -564,17 +547,7 @@ async def admin_user_lookup(message: Message, state: FSMContext):
 
 
 async def _apply_vip_grant(bot, telegram_id: int, days: int = 30) -> datetime:
-    expires = await repo.grant_vip(telegram_id, days)
-    try:
-        await bot.send_message(
-            telegram_id,
-            "⭐ <b>You are now a VIP Member!</b>\n\n"
-            f"Unlimited episodes until <b>{format_date(expires)}</b>.",
-            parse_mode="HTML",
-        )
-    except Exception:
-        pass
-    return expires
+    return await admin_actions.grant_vip_with_notify(bot, telegram_id, days)
 
 
 @router.message(Command("makevip"))

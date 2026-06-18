@@ -22,6 +22,9 @@ ADMIN_IDS: set[int] = {
     int(x.strip()) for x in _admin_ids.split(",") if x.strip().isdigit()
 }
 
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET") or ADMIN_SECRET or "change-me"
+
 STORAGE_CHANNEL_ID = os.getenv("STORAGE_CHANNEL_ID")
 
 
@@ -75,4 +78,10 @@ def validate_config() -> None:
 
         logging.getLogger(__name__).warning(
             "ADMIN_IDS is not set. Admin panel and payment review will not work."
+        )
+    if not ADMIN_SECRET:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "ADMIN_SECRET is not set. Web admin panel at /admin will be disabled."
         )

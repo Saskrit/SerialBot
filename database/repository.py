@@ -405,6 +405,56 @@ async def get_pending_payments(limit: int = 10) -> list[dict[str, Any]]:
     return await cursor.to_list(length=limit)
 
 
+async def get_open_episode_requests(limit: int = 50) -> list[dict[str, Any]]:
+    cursor = (
+        get_db()
+        .episode_requests.find({"status": "open"})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    return await cursor.to_list(length=limit)
+
+
+async def close_episode_request(request_id: str) -> bool:
+    if not ObjectId.is_valid(request_id):
+        return False
+    result = await get_db().episode_requests.update_one(
+        {"_id": ObjectId(request_id), "status": "open"},
+        {"$set": {"status": "closed", "closed_at": datetime.now(TZ)}},
+    )
+    return result.modified_count > 0
+
+
+async def get_open_support_tickets(limit: int = 50) -> list[dict[str, Any]]:
+    cursor = (
+        get_db()
+        .support_tickets.find({"status": "open"})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    return await cursor.to_list(length=limit)
+
+
+async def reply_support_ticket(
+    ticket_id: str, admin_reply: str, admin_id: int
+) -> dict[str, Any] | None:
+    if not ObjectId.is_valid(ticket_id):
+        return None
+    ticket = await get_db().support_tickets.find_one_and_update(
+        {"_id": ObjectId(ticket_id), "status": "open"},
+        {
+            "$set": {
+                "status": "closed",
+                "admin_reply": admin_reply,
+                "replied_by": admin_id,
+                "replied_at": datetime.now(TZ),
+            }
+        },
+        return_document=True,
+    )
+    return ticket
+
+
 async def create_episode_request(user_id: int, serial_name: str, episode_date: str) -> str:
     doc = {
         "user_id": user_id,

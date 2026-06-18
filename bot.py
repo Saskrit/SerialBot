@@ -46,6 +46,10 @@ async def start_web_server() -> web.AppRunner:
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
 
+    from web.routes import setup_admin_routes
+
+    setup_admin_routes(app, create_bot)
+
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", port).start()

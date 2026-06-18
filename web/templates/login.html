@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Login — Serial Hub Admin{% endblock %}
+{% block body %}
+<div class="login-page">
+  <form class="login-card" method="post" action="/admin/login">
+    <h1>Serial Hub Admin</h1>
+    <p class="muted">Sign in with your Telegram ID and admin password.</p>
+    {% if error %}
+    <div class="flash flash-error">{{ error }}</div>
+    {% endif %}
+    <label>
+      Telegram ID
+      <input type="number" name="telegram_id" required autofocus>
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" required>
+    </label>
+    <button type="submit" class="btn btn-primary">Sign in</button>
+  </form>
+</div>
+{% endblock %}

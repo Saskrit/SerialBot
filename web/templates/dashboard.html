@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Serial Hub Admin{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ stats.total }}</div>
+    <div class="stat-label">Total users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ stats.vip }}</div>
+    <div class="stat-label">VIP users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ stats.active_today }}</div>
+    <div class="stat-label">Active today</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ stats.banned }}</div>
+    <div class="stat-label">Banned</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ episode_count }}</div>
+    <div class="stat-label">Episodes</div>
+  </div>
+  <div class="stat-card highlight">
+    <div class="stat-value">{{ pending }}</div>
+    <div class="stat-label">Pending payments</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ open_requests }}</div>
+    <div class="stat-label">Open requests</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ open_tickets }}</div>
+    <div class="stat-label">Open tickets</div>
+  </div>
+</div>
+<p class="muted">Logged in as admin <code>{{ admin_id }}</code>. Episode uploads stay in Telegram via the storage channel.</p>
+{% endblock %}
