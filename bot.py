@@ -10,6 +10,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from config import RESTART_DELAY_SEC, TELEGRAM_PROXY, validate_config
 from database.connection import close_db, init_db
 from handlers import setup_routers
+from middlewares.logging import UpdateLoggingMiddleware
 from middlewares.registration import UserRegistrationMiddleware
 
 logging.basicConfig(
@@ -21,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 IS_RENDER = os.getenv("RENDER") == "true"
 RESTART_ON_CRASH = (
-    os.getenv("RESTART_ON_CRASH", "false" if IS_RENDER else "true").lower() == "true"
+    os.getenv("RESTART_ON_CRASH", "true" if IS_RENDER else "true").lower() == "true"
 )
+POLLING_RETRY_SEC = int(os.getenv("POLLING_RETRY_SEC", "15"))
 
 _web_runner: web.AppRunner | None = None
 
@@ -62,23 +64,48 @@ async def stop_web_server() -> None:
         _web_runner = None
 
 
-async def run_bot(dp: Dispatcher) -> None:
-    bot = create_bot()
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("Webhook cleared. Starting polling (single instance required).")
-        await dp.start_polling(bot, close_bot_session=True)
-    finally:
+async def polling_loop(dp: Dispatcher, shutdown: asyncio.Event) -> None:
+    """Keep polling until shutdown. Restart automatically if polling drops."""
+    while not shutdown.is_set():
+        bot = create_bot()
         try:
-            await bot.session.close()
+            me = await bot.get_me()
+            logger.info(
+                "Telegram bot verified: @%s (id=%s)",
+                me.username,
+                me.id,
+            )
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("Webhook cleared. Starting polling (only ONE instance allowed).")
+            await dp.start_polling(
+                bot,
+                close_bot_session=False,
+                handle_signals=False,
+            )
+            logger.warning("Polling stopped.")
         except Exception:
-            pass
+            logger.exception("Polling error")
+        finally:
+            try:
+                await bot.session.close()
+            except Exception:
+                pass
+
+        if shutdown.is_set():
+            break
+
+        logger.info("Restarting polling in %s seconds...", POLLING_RETRY_SEC)
+        try:
+            await asyncio.wait_for(shutdown.wait(), timeout=POLLING_RETRY_SEC)
+            break
+        except asyncio.TimeoutError:
+            continue
 
 
 async def run_once() -> None:
     validate_config()
 
-    runner = await start_web_server()
+    await start_web_server()
 
     try:
         await init_db()
@@ -88,6 +115,7 @@ async def run_once() -> None:
         raise SystemExit(1) from None
 
     dp = Dispatcher()
+    dp.update.middleware(UpdateLoggingMiddleware())
     dp.message.middleware(UserRegistrationMiddleware())
     dp.callback_query.middleware(UserRegistrationMiddleware())
     dp.include_router(setup_routers())
@@ -105,26 +133,15 @@ async def run_once() -> None:
         except NotImplementedError:
             signal.signal(sig, lambda *_: request_shutdown())
 
-    polling = asyncio.create_task(run_bot(dp))
-    stopper = asyncio.create_task(shutdown.wait())
+    polling = asyncio.create_task(polling_loop(dp, shutdown))
+    await shutdown.wait()
 
-    done, pending = await asyncio.wait(
-        {polling, stopper},
-        return_when=asyncio.FIRST_COMPLETED,
-    )
-
-    for task in pending:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-
-    if shutdown.is_set() and not polling.done():
+    if not polling.done():
         await dp.stop_polling()
+        polling.cancel()
         try:
             await polling
-        except Exception:
+        except asyncio.CancelledError:
             pass
 
     await close_db()
@@ -135,9 +152,7 @@ async def run_forever() -> None:
     while True:
         try:
             await run_once()
-            if not RESTART_ON_CRASH:
-                break
-            logger.warning("Polling stopped unexpectedly.")
+            break
         except SystemExit:
             raise
         except KeyboardInterrupt:
@@ -148,9 +163,8 @@ async def run_forever() -> None:
                 logger.exception("Fatal error, exiting.")
                 raise
             logger.exception("Bot crashed, will restart")
-
-        logger.info("Restarting in %s seconds...", RESTART_DELAY_SEC)
-        await asyncio.sleep(RESTART_DELAY_SEC)
+            logger.info("Restarting in %s seconds...", RESTART_DELAY_SEC)
+            await asyncio.sleep(RESTART_DELAY_SEC)
 
 
 if __name__ == "__main__":

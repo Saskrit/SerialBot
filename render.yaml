@@ -24,4 +24,4 @@ services:
       - key: PAYMENT_NAME
         value: Serial Hub
       - key: RESTART_ON_CRASH
-        value: "false"
+        value: "true"
