@@ -17,4 +17,5 @@ class SupportStates(StatesGroup):
 class AdminStates(StatesGroup):
     broadcast_message = State()
     lookup_user = State()
+    grant_vip_user = State()
     reply_support = State()

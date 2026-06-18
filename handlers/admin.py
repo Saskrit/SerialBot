@@ -4,6 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from datetime import datetime
 
 from config import ADMIN_IDS, STORAGE_CHANNEL_ID
 from database import repository as repo
@@ -397,6 +398,83 @@ async def admin_user_lookup(message: Message, state: FSMContext):
     await state.clear()
 
 
+async def _apply_vip_grant(bot, telegram_id: int, days: int = 30) -> datetime:
+    await repo.get_or_create_user(telegram_id)
+    expires = await repo.grant_vip(telegram_id, days)
+    try:
+        await bot.send_message(
+            telegram_id,
+            f"⭐ <b>VIP activated!</b>\nValid until {format_date(expires)}.",
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
+    return expires
+
+
+@router.message(Command("makevip"))
+async def makevip_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        await message.answer(
+            "Usage:\n"
+            "<code>/makevip USER_ID</code>\n"
+            "<code>/makevip USER_ID 30</code> (days, optional)",
+            parse_mode="HTML",
+        )
+        return
+
+    telegram_id = int(parts[1])
+    days = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 30
+    expires = await _apply_vip_grant(message.bot, telegram_id, days)
+    await message.answer(
+        f"✅ User <code>{telegram_id}</code> is now VIP until "
+        f"<b>{format_date(expires)}</b> ({days} days).",
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == "admin:grantvip")
+async def admin_grant_vip_start(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    await state.set_state(AdminStates.grant_vip_user)
+    await callback.message.answer(
+        "⭐ <b>Grant VIP</b>\n\n"
+        "Send the user's Telegram ID:\n"
+        "Example: <code>6831347256</code>\n\n"
+        "Or use: <code>/makevip USER_ID</code>",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.message(AdminStates.grant_vip_user)
+async def admin_grant_vip_by_id(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    text = message.text.strip()
+    parts = text.split()
+    if not parts[0].isdigit():
+        await message.answer("Please send a numeric Telegram ID.")
+        return
+
+    telegram_id = int(parts[0])
+    days = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 30
+    expires = await _apply_vip_grant(message.bot, telegram_id, days)
+    await message.answer(
+        f"✅ User <code>{telegram_id}</code> is now VIP until "
+        f"<b>{format_date(expires)}</b> ({days} days).",
+        parse_mode="HTML",
+    )
+    await state.clear()
+
+
 @router.callback_query(F.data.startswith("admin:vip:"))
 async def admin_grant_vip(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
@@ -404,13 +482,8 @@ async def admin_grant_vip(callback: CallbackQuery):
         return
 
     telegram_id = int(callback.data.split(":", 2)[2])
-    expires = await repo.grant_vip(telegram_id)
-    await callback.bot.send_message(
-        telegram_id,
-        f"⭐ Admin granted VIP until {format_date(expires)}.",
-        parse_mode="HTML",
-    )
-    await callback.answer("VIP granted ✅")
+    expires = await _apply_vip_grant(callback.bot, telegram_id)
+    await callback.answer(f"VIP granted until {format_date(expires)} ✅")
 
 
 @router.callback_query(F.data.startswith("admin:ban:"))

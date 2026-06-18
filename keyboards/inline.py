@@ -140,6 +140,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
             [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
             [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],
+            [InlineKeyboardButton(text="⭐ Grant VIP", callback_data="admin:grantvip")],
             [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
         ]
     )
