@@ -16,7 +16,7 @@ async def get_or_create_user(
     telegram_id: int,
     username: str | None = None,
     first_name: str | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], bool]:
     db = get_db()
     now = datetime.now(TZ)
     user = await db.users.find_one({"telegram_id": telegram_id})
@@ -36,7 +36,7 @@ async def get_or_create_user(
         if first_name is not None:
             user["first_name"] = first_name
         user["last_active"] = now
-        return normalize_user_datetimes(await _normalize_daily_usage(user))
+        return normalize_user_datetimes(await _normalize_daily_usage(user)), False
 
     doc = {
         "telegram_id": telegram_id,
@@ -52,7 +52,7 @@ async def get_or_create_user(
         "last_active": now,
     }
     await db.users.insert_one(doc)
-    return normalize_user_datetimes(doc)
+    return normalize_user_datetimes(doc), True
 
 
 async def _normalize_daily_usage(user: dict[str, Any]) -> dict[str, Any]:

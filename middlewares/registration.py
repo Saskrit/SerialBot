@@ -5,6 +5,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from database import repository as repo
+from services.admin_notifications import notify_admins_new_user
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +18,16 @@ class UserRegistrationMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         user = None
+        is_new_user = False
         try:
             if isinstance(event, Message) and event.from_user:
-                user = await repo.get_or_create_user(
+                user, is_new_user = await repo.get_or_create_user(
                     event.from_user.id,
                     event.from_user.username,
                     event.from_user.first_name,
                 )
             elif isinstance(event, CallbackQuery) and event.from_user:
-                user = await repo.get_or_create_user(
+                user, is_new_user = await repo.get_or_create_user(
                     event.from_user.id,
                     event.from_user.username,
                     event.from_user.first_name,
@@ -40,6 +42,16 @@ class UserRegistrationMiddleware(BaseMiddleware):
 
         if user:
             data["db_user"] = user
+            if is_new_user and event.from_user:
+                try:
+                    await notify_admins_new_user(
+                        event.bot,
+                        event.from_user.id,
+                        username=event.from_user.username,
+                        first_name=event.from_user.first_name,
+                    )
+                except Exception:
+                    logger.exception("Failed to notify admins about new user")
             if user.get("banned") and not (
                 isinstance(event, Message)
                 and event.text
