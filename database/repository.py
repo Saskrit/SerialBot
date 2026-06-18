@@ -5,6 +5,7 @@ from bson import ObjectId
 
 from config import FREE_DAILY_LIMIT, TZ
 from database.connection import get_db
+from database.datetime_utils import ensure_aware, normalize_user_datetimes
 
 
 def _today() -> date:
@@ -34,7 +35,7 @@ async def get_or_create_user(
         user["username"] = username
         user["first_name"] = first_name
         user["last_active"] = now
-        return await _normalize_daily_usage(user)
+        return normalize_user_datetimes(await _normalize_daily_usage(user))
 
     doc = {
         "telegram_id": telegram_id,
@@ -50,7 +51,7 @@ async def get_or_create_user(
         "last_active": now,
     }
     await db.users.insert_one(doc)
-    return doc
+    return normalize_user_datetimes(doc)
 
 
 async def _normalize_daily_usage(user: dict[str, Any]) -> dict[str, Any]:
@@ -70,8 +71,9 @@ async def _check_vip_expiry(user: dict[str, Any]) -> dict[str, Any]:
     if user.get("plan") != "vip":
         return user
 
-    expires = user.get("vip_expires")
-    if expires and expires < datetime.now(TZ):
+    expires = ensure_aware(user.get("vip_expires"))
+    now = datetime.now(TZ)
+    if expires and expires < now:
         db = get_db()
         await db.users.update_one(
             {"telegram_id": user["telegram_id"]},
@@ -85,7 +87,7 @@ async def _check_vip_expiry(user: dict[str, Any]) -> dict[str, Any]:
 async def get_user(telegram_id: int) -> dict[str, Any] | None:
     user = await get_db().users.find_one({"telegram_id": telegram_id})
     if user:
-        return await _normalize_daily_usage(user)
+        return normalize_user_datetimes(await _normalize_daily_usage(user))
     return None
 
 
@@ -118,8 +120,10 @@ async def grant_vip(telegram_id: int, days: int = 30) -> datetime:
     now = datetime.now(TZ)
     user = await get_user(telegram_id)
     base = now
-    if user and user.get("vip_expires") and user["vip_expires"] > now:
-        base = user["vip_expires"]
+    if user:
+        current_expires = ensure_aware(user.get("vip_expires"))
+        if current_expires and current_expires > now:
+            base = current_expires
     expires = base + timedelta(days=days)
     await get_db().users.update_one(
         {"telegram_id": telegram_id},

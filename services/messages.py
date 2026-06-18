@@ -2,6 +2,7 @@ from datetime import datetime
 
 from config import EPISODES_PER_PAGE, FREE_DAILY_LIMIT, TZ
 from database import repository as repo
+from database.datetime_utils import ensure_aware
 
 
 def format_date(dt: datetime) -> str:
@@ -29,7 +30,7 @@ def _usage_summary(user: dict) -> str:
 def _vip_time_remaining(user: dict) -> str | None:
     if user.get("plan") != "vip":
         return None
-    expires = user.get("vip_expires")
+    expires = ensure_aware(user.get("vip_expires"))
     if not expires:
         return None
     now = datetime.now(TZ)
@@ -70,7 +71,7 @@ def build_status_text(user: dict, *, is_admin: bool = False) -> str:
 
     if user.get("plan") == "vip":
         lines.extend(["", "⭐ <b>VIP Membership</b>"])
-        expires = user.get("vip_expires")
+        expires = ensure_aware(user.get("vip_expires"))
         if expires:
             lines.append(f"Expires on: <b>{format_datetime(expires)}</b>")
             remaining = _vip_time_remaining(user)
