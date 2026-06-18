@@ -20,10 +20,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-IS_RENDER = os.getenv("RENDER") == "true"
-RESTART_ON_CRASH = (
-    os.getenv("RESTART_ON_CRASH", "true" if IS_RENDER else "true").lower() == "true"
-)
+RESTART_ON_CRASH = os.getenv("RESTART_ON_CRASH", "true").lower() == "true"
 POLLING_RETRY_SEC = int(os.getenv("POLLING_RETRY_SEC", "15"))
 
 _web_runner: web.AppRunner | None = None

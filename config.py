@@ -68,7 +68,7 @@ def validate_config() -> None:
         raise SystemExit(
             "Missing required environment variables: "
             + ", ".join(missing)
-            + ". Set them in Render Dashboard → Environment."
+            + ". Set them in Railway → Service → Variables."
         )
     if not ADMIN_IDS:
         import logging
