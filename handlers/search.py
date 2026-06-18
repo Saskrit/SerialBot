@@ -1,0 +1,50 @@
+from aiogram import F, Router
+from aiogram.filters import StateFilter
+from aiogram.types import Message
+
+from database import repository as repo
+from keyboards.inline import episode_list_keyboard
+from services.messages import build_episode_list_text
+from services.serial_matcher import match_serial
+
+router = Router()
+
+MENU_BUTTONS = {
+    "🔍 Search Serial",
+    "📋 My Plan",
+    "⭐ Get VIP",
+    "📺 Request Episode",
+    "💬 Support",
+}
+
+
+@router.message(
+    F.text & ~F.text.in_(MENU_BUTTONS) & ~F.text.startswith("/"),
+    StateFilter(None),
+)
+async def serial_search(message: Message):
+    serial = await match_serial(message.text)
+    if not serial:
+        serials = await repo.list_serials()
+        sample = ", ".join(s["name"] for s in serials[:6])
+        await message.answer(
+            "❌ Serial not found.\n\n"
+            f"Try a name like: {sample}…",
+            parse_mode="HTML",
+        )
+        return
+
+    text, _ = await build_episode_list_text(serial, 0)
+    keyboard = await episode_list_keyboard(serial["slug"], 0)
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.message(F.text == "🔍 Search Serial")
+async def search_hint(message: Message):
+    await message.answer(
+        "🔍 <b>Search a serial</b>\n\n"
+        "Just type the serial name — abbreviations work too:\n"
+        "• Anupamaa · Udne Ki Aasha · YRKKH\n"
+        "• Jagadhatri · TMKOC · Naagin 7",
+        parse_mode="HTML",
+    )
