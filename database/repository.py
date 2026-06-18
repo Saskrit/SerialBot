@@ -235,6 +235,35 @@ async def get_episode(episode_id: str) -> dict[str, Any] | None:
     return await get_db().episodes.find_one({"_id": ObjectId(episode_id)})
 
 
+async def delete_episode(episode_id: str) -> dict[str, Any] | None:
+    if not ObjectId.is_valid(episode_id):
+        return None
+    db = get_db()
+    episode = await db.episodes.find_one_and_delete({"_id": ObjectId(episode_id)})
+    if episode:
+        await db.users.update_many(
+            {"unlocked_episodes": episode_id},
+            {"$pull": {"unlocked_episodes": episode_id}},
+        )
+    return episode
+
+
+async def delete_episode_by_serial_date(
+    serial_slug: str, episode_date: datetime
+) -> dict[str, Any] | None:
+    db = get_db()
+    episode = await db.episodes.find_one_and_delete(
+        {"serial_slug": serial_slug, "date": episode_date}
+    )
+    if episode:
+        ep_id = str(episode["_id"])
+        await db.users.update_many(
+            {"unlocked_episodes": ep_id},
+            {"$pull": {"unlocked_episodes": ep_id}},
+        )
+    return episode
+
+
 async def create_payment(
     user_id: int,
     payment_type: str,

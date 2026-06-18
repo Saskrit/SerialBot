@@ -18,4 +18,5 @@ class AdminStates(StatesGroup):
     broadcast_message = State()
     lookup_user = State()
     grant_vip_user = State()
+    delete_episode_serial = State()
     reply_support = State()

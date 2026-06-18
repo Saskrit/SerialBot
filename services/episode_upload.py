@@ -90,11 +90,12 @@ async def save_episode_from_message(
 
 
 async def save_episode_from_addepisode(command: Message) -> tuple[bool, str]:
-    """Parse /addepisode reply — video caption first, then command arguments."""
+    """Parse /addepisode reply — uses the replied video's caption when present."""
     if not command.reply_to_message:
         return False, (
-            "Reply to a video with a valid caption, or use:\n"
-            "<code>/addepisode laughter-chef-3 | 17 June 2026</code>"
+            "Reply to a video that has this caption:\n"
+            "<code>Laughter Chef 3 | 17 June 2026</code>\n\n"
+            "Then send only: <code>/addepisode</code>"
         )
 
     src = command.reply_to_message
@@ -106,6 +107,8 @@ async def save_episode_from_addepisode(command: Message) -> tuple[bool, str]:
         serial, episode_date, error = await parse_upload_caption(video_caption)
         if serial and episode_date:
             return await _save_from_parsed(src, serial, episode_date)
+        if error:
+            return False, error
 
     command_text = (command.text or "").strip()
     parts = command_text.split(maxsplit=1)
@@ -125,10 +128,10 @@ async def save_episode_from_addepisode(command: Message) -> tuple[bool, str]:
 
     return False, (
         "Could not parse episode details.\n\n"
-        "Add caption to the video:\n"
+        "Put this caption on the video:\n"
         "<code>Laughter Chef 3 | 17 June 2026</code>\n\n"
-        "Or reply with:\n"
-        "<code>/addepisode laughter-chef-3 | 17 June 2026</code>"
+        "Then reply to that video with only:\n"
+        "<code>/addepisode</code>"
     )
 
 

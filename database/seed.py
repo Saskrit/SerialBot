@@ -77,7 +77,7 @@ SERIALS = [
   {
     "name": "Laughter Chef 3",
     "slug": "laughter-chef-3",
-    "aliases": ["laughter chef", "laughter", "laughter chef 3", "lc3"],
+    "aliases": ["laughter chef", "laughter", "laughter chef 3", "laughter challenge 3", "laughter challenge", "lc3"],
   },
   {
     "name": "Vasudha",

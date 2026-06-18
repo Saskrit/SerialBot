@@ -3,11 +3,16 @@ from datetime import datetime
 
 from config import TZ
 from database.connection import get_db
-from services.serial_matcher import match_serial
+from services.serial_matcher import match_serial, match_serial_best_from_text
+
+MONTH_NAMES = (
+    "january|february|march|april|may|june|july|august|september|october|november|december"
+    "|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec"
+)
 
 DATE_PATTERNS = [
     re.compile(r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})"),
-    re.compile(r"(\d{1,2})\s+(\w+)\s+(\d{4})", re.IGNORECASE),
+    re.compile(rf"(\d{{1,2}})\s+({MONTH_NAMES})\s+(\d{{4}})", re.IGNORECASE),
 ]
 
 MONTHS = {
@@ -46,27 +51,46 @@ def parse_episode_date(text: str) -> datetime | None:
     return None
 
 
+def _extract_date(caption: str) -> tuple[str, str] | None:
+    """Find the date in caption and return (serial_part, date_str)."""
+    best_match = None
+    for pattern in DATE_PATTERNS:
+        for match in pattern.finditer(caption):
+            date_str = match.group(0).strip()
+            if parse_episode_date(date_str) is None:
+                continue
+            if best_match is None or match.start() > best_match.start():
+                best_match = match
+
+    if not best_match:
+        return None
+
+    date_str = best_match.group(0).strip()
+    serial_part = caption[: best_match.start()].strip().strip("-–:|")
+    serial_part = serial_part.strip()
+    if not serial_part:
+        serial_part = caption[best_match.end() :].strip().strip("-–:|")
+    return serial_part, date_str
+
+
 def _split_serial_and_date(caption: str) -> tuple[str, str] | None:
     caption = caption.strip()
     if not caption:
         return None
 
-    for sep in ("|", "\n"):
-        if sep in caption:
-            left, right = caption.split(sep, 1)
-            left, right = left.strip(), right.strip()
-            if left and right:
-                return left, right
+    if "|" in caption:
+        left, right = caption.rsplit("|", 1)
+        left, right = left.strip(), right.strip()
+        if left and right and parse_episode_date(right):
+            return left, right
 
-    for pattern in DATE_PATTERNS:
-        match = pattern.search(caption)
-        if match:
-            date_str = match.group(0).strip()
-            serial_part = caption[: match.start()].strip().strip("-–:|")
-            if serial_part:
-                return serial_part, date_str
+    if "\n" in caption:
+        left, right = caption.rsplit("\n", 1)
+        left, right = left.strip(), right.strip()
+        if left and right and parse_episode_date(right):
+            return left, right
 
-    return None
+    return _extract_date(caption)
 
 
 async def _resolve_serial(serial_query: str) -> dict | None:
@@ -79,14 +103,15 @@ async def _resolve_serial(serial_query: str) -> dict | None:
     if serial:
         return serial
 
+    if "|" in query or "\n" in query:
+        serial = await match_serial_best_from_text(query)
+        if serial:
+            return serial
+
     return await match_serial(query)
 
 
 async def parse_upload_caption(caption: str) -> tuple[dict | None, datetime | None, str]:
-    """
-    Parse channel upload caption into serial, date, and error reason.
-    Returns (serial, date, error_message).
-    """
     if not caption or not caption.strip():
         return None, None, "Caption is empty. Use: Laughter Chef 3 | 17 June 2026"
 

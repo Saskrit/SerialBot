@@ -180,6 +180,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
             [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],
             [InlineKeyboardButton(text="⭐ Grant VIP", callback_data="admin:grantvip")],
+            [InlineKeyboardButton(text="🗑 Manage Episodes", callback_data="admin:deleps")],
             [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
         ]
     )
@@ -224,5 +225,65 @@ def admin_user_keyboard(telegram_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="✅ Unban", callback_data=f"admin:unban:{telegram_id}"),
                 InlineKeyboardButton(text="🗑 Delete", callback_data=f"admin:del:{telegram_id}"),
             ],
+        ]
+    )
+
+
+ADMIN_EPISODES_PER_PAGE = 8
+
+
+async def admin_episodes_keyboard(
+    serial_slug: str, page: int
+) -> InlineKeyboardMarkup:
+    episodes, total = await repo.get_episodes(serial_slug, page, ADMIN_EPISODES_PER_PAGE)
+    rows: list[list[InlineKeyboardButton]] = []
+
+    for ep in episodes:
+        label = format_date(ep["date"])
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"🗑 {label}",
+                    callback_data=f"admin:delep:{str(ep['_id'])}:{page}",
+                )
+            ]
+        )
+
+    total_pages = max(1, (total + ADMIN_EPISODES_PER_PAGE - 1) // ADMIN_EPISODES_PER_PAGE)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(
+                text="◀ Prev",
+                callback_data=f"admin:epslist:{serial_slug}:{page - 1}",
+            )
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="Next ▶",
+                callback_data=f"admin:epslist:{serial_slug}:{page + 1}",
+            )
+        )
+    if nav:
+        rows.append(nav)
+
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def admin_delete_episode_confirm_keyboard(episode_id: str, serial_slug: str, page: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Yes, delete",
+                    callback_data=f"admin:delepok:{episode_id}",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Cancel",
+                    callback_data=f"admin:epslist:{serial_slug}:{page}",
+                ),
+            ]
         ]
     )
