@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from config import EPISODES_PER_PAGE, FREE_DAILY_LIMIT, TZ
+from config import EPISODES_PER_PAGE, FREE_DAILY_LIMIT, TZ, SERIALS_PER_PAGE
 from database import repository as repo
 from database.datetime_utils import ensure_aware
 
@@ -172,13 +172,33 @@ def build_plan_text(user: dict) -> str:
 async def build_episode_list_text(serial: dict, page: int) -> tuple[str, int]:
     episodes, total = await repo.get_episodes(serial["slug"], page, EPISODES_PER_PAGE)
     if total == 0:
-        return f"📺 <b>{serial['name']}</b>\n\nNo episodes uploaded yet.", 0
+        return (
+            f"📺 <b>{serial['name']}</b>\n\n"
+            "No episodes uploaded yet.\n"
+            "Use 📺 Request Episode to ask for one.",
+            0,
+        )
 
     total_pages = max(1, (total + EPISODES_PER_PAGE - 1) // EPISODES_PER_PAGE)
     lines = [
         f"📺 <b>{serial['name']}</b>",
-        f"Episodes · Page {page + 1}/{total_pages}",
+        f"<b>{total}</b> episode(s) available · Page {page + 1}/{total_pages}",
         "",
         "Select an episode to watch:",
     ]
     return "\n".join(lines), total_pages
+
+
+async def build_catalog_text(page: int) -> str:
+    serials, total = await repo.list_serials_catalog(page, SERIALS_PER_PAGE)
+    total_pages = max(1, (total + SERIALS_PER_PAGE - 1) // SERIALS_PER_PAGE)
+    with_eps = sum(1 for s in serials if s.get("episode_count", 0) > 0)
+
+    lines = [
+        "📚 <b>Browse Serials</b>",
+        f"Page {page + 1}/{total_pages} · <b>{total}</b> serials in catalog",
+        "",
+        "Tap a serial to view its episodes.",
+        f"On this page: <b>{with_eps}</b> with episodes available.",
+    ]
+    return "\n".join(lines)

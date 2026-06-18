@@ -1,17 +1,17 @@
 import logging
+from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from datetime import datetime
 
 from config import ADMIN_IDS, STORAGE_CHANNEL_ID
 from database import repository as repo
 from database.connection import get_db
 from keyboards.inline import admin_menu_keyboard, admin_user_keyboard, admin_users_keyboard
 from services.messages import format_date
-from services.upload_parser import parse_episode_date, parse_upload_caption
+from services.episode_upload import save_episode_from_addepisode, save_episode_from_message
 from states import AdminStates
 
 logger = logging.getLogger(__name__)
@@ -35,46 +35,23 @@ def _is_storage_chat(message: Message) -> bool:
     return bool(STORAGE_CHANNEL_ID and message.chat.id == STORAGE_CHANNEL_ID)
 
 
-async def process_storage_upload(message: Message) -> None:
+async def process_storage_upload(message: Message, *, is_caption_edit: bool = False) -> None:
     if not _is_storage_chat(message):
         return
 
-    if not (message.video or message.document):
-        return
-
-    caption = message.caption or ""
-    serial, episode_date, error = await parse_upload_caption(caption)
-    if error or not serial or not episode_date:
-        logger.warning("Storage upload failed: %s | caption=%r", error, caption)
-        preview = caption[:300] if caption else "(no caption)"
+    ok, status = await save_episode_from_message(
+        message,
+        silent_empty_caption=not is_caption_edit,
+        is_caption_edit=is_caption_edit,
+        notify=True,
+    )
+    if not ok and status:
+        preview = (message.caption or "")[:300] or "(no caption)"
         await _notify_admins(
             message.bot,
             f"❌ <b>Storage upload failed</b>\n\n"
-            f"Caption: <code>{preview}</code>\n\n{error}",
+            f"Caption: <code>{preview}</code>\n\n{status}",
         )
-        return
-
-    file_id = message.video.file_id if message.video else message.document.file_id
-    unique_id = (
-        message.video.file_unique_id if message.video else message.document.file_unique_id
-    )
-
-    ep_id = await repo.add_episode(
-        serial_slug=serial["slug"],
-        serial_name=serial["name"],
-        episode_date=episode_date,
-        file_id=file_id,
-        file_unique_id=unique_id,
-        message_id=message.message_id,
-    )
-    logger.info("Episode saved: %s — %s (%s)", serial["name"], episode_date, ep_id)
-    await _notify_admins(
-        message.bot,
-        f"✅ <b>Episode saved</b>\n"
-        f"Serial: <b>{serial['name']}</b>\n"
-        f"Date: {format_date(episode_date)}\n"
-        f"ID: <code>{ep_id}</code>",
-    )
 
 
 @router.message(Command("storageinfo"))
@@ -96,6 +73,7 @@ async def storage_info(message: Message):
             "<code>Laughter Chef 3 | 17 June 2026</code>",
             "<code>laughter-chef-3 | 17-06-2026</code>",
             "",
+            "Upload video first, then edit caption — or reply with /addepisode.",
             "Bot must be <b>admin</b> in the storage channel/group.",
         ]
     )
@@ -576,53 +554,44 @@ async def storage_channel_upload(message: Message):
     await process_storage_upload(message)
 
 
+@router.edited_channel_post(F.video | F.document)
+async def storage_channel_upload_edited(message: Message):
+    await process_storage_upload(message, is_caption_edit=True)
+
+
 if STORAGE_CHANNEL_ID:
 
     @router.message(F.chat.id == STORAGE_CHANNEL_ID, F.video | F.document)
     async def storage_group_upload(message: Message):
         await process_storage_upload(message)
 
+    @router.edited_message(F.chat.id == STORAGE_CHANNEL_ID, F.video | F.document)
+    async def storage_group_upload_edited(message: Message):
+        await process_storage_upload(message, is_caption_edit=True)
+
+
+def _can_run_addepisode(message: Message) -> bool:
+    if message.from_user and is_admin(message.from_user.id):
+        return True
+    return _is_storage_chat(message)
+
+
+async def _handle_addepisode(message: Message) -> None:
+    if not _can_run_addepisode(message):
+        return
+
+    ok, status = await save_episode_from_addepisode(message)
+    if status:
+        await message.answer(status, parse_mode="HTML")
+
 
 @router.message(Command("addepisode"))
 async def admin_add_episode_cmd(message: Message):
-    if not is_admin(message.from_user.id):
-        return
+    await _handle_addepisode(message)
 
-    if not message.reply_to_message or not (
-        message.reply_to_message.video or message.reply_to_message.document
-    ):
-        await message.answer(
-            "Reply to a video with:\n"
-            "<code>/addepisode serial_slug 17-06-2026</code>",
-            parse_mode="HTML",
-        )
-        return
 
-    args = message.text.split(maxsplit=2)
-    if len(args) < 3:
-        await message.answer("Usage: /addepisode serial_slug 17-06-2026")
-        return
+if STORAGE_CHANNEL_ID:
 
-    slug = args[1].lower()
-    serial = await repo.get_serial_by_slug(slug)
-    if not serial:
-        await message.answer(f"Serial slug '{slug}' not found.")
-        return
-
-    episode_date = parse_episode_date(args[2])
-    if not episode_date:
-        await message.answer("Could not parse date.")
-        return
-
-    src = message.reply_to_message
-    file_id = src.video.file_id if src.video else src.document.file_id
-    unique_id = src.video.file_unique_id if src.video else src.document.file_unique_id
-
-    ep_id = await repo.add_episode(
-        serial_slug=serial["slug"],
-        serial_name=serial["name"],
-        episode_date=episode_date,
-        file_id=file_id,
-        file_unique_id=unique_id,
-    )
-    await message.answer(f"✅ Episode saved: {serial['name']} — {args[2]} ({ep_id})")
+    @router.message(F.chat.id == STORAGE_CHANNEL_ID, Command("addepisode"))
+    async def storage_add_episode_cmd(message: Message):
+        await _handle_addepisode(message)

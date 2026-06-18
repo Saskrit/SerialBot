@@ -221,7 +221,7 @@ async def get_episodes(serial_slug: str, page: int, per_page: int) -> tuple[list
     total = await db.episodes.count_documents({"serial_slug": serial_slug})
     cursor = (
         db.episodes.find({"serial_slug": serial_slug})
-        .sort("date", -1)
+        .sort([("date", -1), ("_id", -1)])
         .skip(page * per_page)
         .limit(per_page)
     )
@@ -333,6 +333,37 @@ async def create_support_ticket(user_id: int, category: str, message: str) -> st
     return str(result.inserted_id)
 
 
+async def upsert_episode(
+    serial_slug: str,
+    serial_name: str,
+    episode_date: datetime,
+    file_id: str,
+    file_unique_id: str,
+    message_id: int | None = None,
+) -> tuple[str, bool]:
+    """Insert or update episode by serial + date. Returns (episode_id, created)."""
+    db = get_db()
+    now = datetime.now(TZ)
+    payload = {
+        "serial_slug": serial_slug,
+        "serial_name": serial_name,
+        "date": episode_date,
+        "file_id": file_id,
+        "file_unique_id": file_unique_id,
+        "message_id": message_id,
+        "uploaded_at": now,
+    }
+    existing = await db.episodes.find_one(
+        {"serial_slug": serial_slug, "date": episode_date}
+    )
+    if existing:
+        await db.episodes.update_one({"_id": existing["_id"]}, {"$set": payload})
+        return str(existing["_id"]), False
+
+    result = await db.episodes.insert_one(payload)
+    return str(result.inserted_id), True
+
+
 async def add_episode(
     serial_slug: str,
     serial_name: str,
@@ -341,17 +372,10 @@ async def add_episode(
     file_unique_id: str,
     message_id: int | None = None,
 ) -> str:
-    doc = {
-        "serial_slug": serial_slug,
-        "serial_name": serial_name,
-        "date": episode_date,
-        "file_id": file_id,
-        "file_unique_id": file_unique_id,
-        "message_id": message_id,
-        "uploaded_at": datetime.now(TZ),
-    }
-    result = await get_db().episodes.insert_one(doc)
-    return str(result.inserted_id)
+    ep_id, _ = await upsert_episode(
+        serial_slug, serial_name, episode_date, file_id, file_unique_id, message_id
+    )
+    return ep_id
 
 
 async def get_serial_by_slug(slug: str) -> dict[str, Any] | None:
@@ -361,3 +385,22 @@ async def get_serial_by_slug(slug: str) -> dict[str, Any] | None:
 async def list_serials() -> list[dict[str, Any]]:
     cursor = get_db().serials.find({"active": True}).sort("name", 1)
     return await cursor.to_list(length=200)
+
+
+async def list_serials_catalog(
+    page: int, per_page: int
+) -> tuple[list[dict[str, Any]], int]:
+    db = get_db()
+    total = await db.serials.count_documents({"active": True})
+    cursor = (
+        db.serials.find({"active": True})
+        .sort("name", 1)
+        .skip(page * per_page)
+        .limit(per_page)
+    )
+    serials = await cursor.to_list(length=per_page)
+    for serial in serials:
+        serial["episode_count"] = await db.episodes.count_documents(
+            {"serial_slug": serial["slug"]}
+        )
+    return serials, total

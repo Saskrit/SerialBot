@@ -24,7 +24,7 @@ async def episode_page(callback: CallbackQuery):
         return
 
     text, _ = await build_episode_list_text(serial, page)
-    keyboard = await episode_list_keyboard(serial_slug, page)
+    keyboard = await episode_list_keyboard(serial_slug, page, show_catalog_back=True)
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
 

@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
-from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, VIP_MONTHLY_PRICE
+from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, SERIALS_PER_PAGE, VIP_MONTHLY_PRICE
 from database import repository as repo
 from services.messages import format_date
 
@@ -8,7 +8,10 @@ from services.messages import format_date
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🔍 Search Serial")],
+            [
+                KeyboardButton(text="🔍 Search Serial"),
+                KeyboardButton(text="📚 Browse Serials"),
+            ],
             [
                 KeyboardButton(text="📋 My Plan"),
                 KeyboardButton(text="⭐ Get VIP"),
@@ -22,7 +25,38 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-async def episode_list_keyboard(serial_slug: str, page: int) -> InlineKeyboardMarkup:
+async def serial_catalog_keyboard(page: int) -> InlineKeyboardMarkup:
+    serials, total = await repo.list_serials_catalog(page, SERIALS_PER_PAGE)
+    rows: list[list[InlineKeyboardButton]] = []
+
+    for serial in serials:
+        count = serial.get("episode_count", 0)
+        icon = "📺" if count > 0 else "📭"
+        label = f"{icon} {serial['name']} ({count})"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"pick:{serial['slug']}",
+                )
+            ]
+        )
+
+    total_pages = max(1, (total + SERIALS_PER_PAGE - 1) // SERIALS_PER_PAGE)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀ Prev", callback_data=f"cat:{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton(text="Next ▶", callback_data=f"cat:{page + 1}"))
+    if nav:
+        rows.append(nav)
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def episode_list_keyboard(
+    serial_slug: str, page: int, *, show_catalog_back: bool = False
+) -> InlineKeyboardMarkup:
     episodes, total = await repo.get_episodes(serial_slug, page, EPISODES_PER_PAGE)
     rows: list[list[InlineKeyboardButton]] = []
 
@@ -55,6 +89,11 @@ async def episode_list_keyboard(serial_slug: str, page: int) -> InlineKeyboardMa
         )
     if nav:
         rows.append(nav)
+
+    if show_catalog_back:
+        rows.append(
+            [InlineKeyboardButton(text="📚 All Serials", callback_data="cat:0")]
+        )
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

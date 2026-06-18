@@ -12,6 +12,7 @@ router = Router()
 
 MENU_BUTTONS = {
     "🔍 Search Serial",
+    "📚 Browse Serials",
     "📋 My Plan",
     "⭐ Get VIP",
     "📺 Request Episode",
@@ -40,7 +41,7 @@ async def serial_search(message: Message):
         return
 
     text, _ = await build_episode_list_text(serial, 0)
-    keyboard = await episode_list_keyboard(serial["slug"], 0)
+    keyboard = await episode_list_keyboard(serial["slug"], 0, show_catalog_back=False)
     await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
