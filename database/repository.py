@@ -188,6 +188,30 @@ async def get_all_user_ids() -> list[int]:
     return [doc["telegram_id"] async for doc in cursor]
 
 
+async def list_users(page: int, per_page: int = 15) -> tuple[list[dict[str, Any]], int]:
+    db = get_db()
+    total = await db.users.count_documents({})
+    cursor = (
+        db.users.find(
+            {},
+            {
+                "telegram_id": 1,
+                "first_name": 1,
+                "username": 1,
+                "plan": 1,
+                "banned": 1,
+                "daily_watches": 1,
+                "registered_at": 1,
+            },
+        )
+        .sort("registered_at", -1)
+        .skip(page * per_page)
+        .limit(per_page)
+    )
+    users = await cursor.to_list(length=per_page)
+    return users, total
+
+
 async def get_episodes(serial_slug: str, page: int, per_page: int) -> tuple[list[dict], int]:
     db = get_db()
     total = await db.episodes.count_documents({"serial_slug": serial_slug})

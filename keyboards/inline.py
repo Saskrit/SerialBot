@@ -129,6 +129,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
+            [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
             [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
             [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
             [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
@@ -136,6 +137,23 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
         ]
     )
+
+
+def admin_users_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(text="◀ Prev", callback_data=f"admin:users:{page - 1}")
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(text="Next ▶", callback_data=f"admin:users:{page + 1}")
+        )
+    if nav:
+        rows.append(nav)
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def admin_payment_keyboard(payment_id: str) -> InlineKeyboardMarkup:

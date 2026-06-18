@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 from config import ADMIN_IDS, STORAGE_CHANNEL_ID, TZ
 from database import repository as repo
 from database.connection import get_db
-from keyboards.inline import admin_menu_keyboard, admin_user_keyboard
+from keyboards.inline import admin_menu_keyboard, admin_user_keyboard, admin_users_keyboard
 from services.messages import format_date
 from states import AdminStates
 
@@ -32,6 +32,77 @@ async def admin_panel(message: Message):
         reply_markup=admin_menu_keyboard(),
         parse_mode="HTML",
     )
+
+
+USERS_PER_PAGE = 15
+
+
+def _format_user_line(index: int, user: dict) -> str:
+    name = user.get("first_name") or "Unknown"
+    username = user.get("username")
+    user_label = f"{name} (@{username})" if username else name
+    plan = "VIP" if user.get("plan") == "vip" else "Free"
+    status = "🚫" if user.get("banned") else "✅"
+    usage = "∞" if user.get("plan") == "vip" else f"{user.get('daily_watches', 0)}/3 today"
+    return (
+        f"{index}. {status} <b>{user_label}</b>\n"
+        f"   ID: <code>{user['telegram_id']}</code> · {plan} · {usage}"
+    )
+
+
+async def _send_users_page(target: Message | CallbackQuery, page: int) -> None:
+    users, total = await repo.list_users(page, USERS_PER_PAGE)
+    if total == 0:
+        text = "👥 <b>All Users</b>\n\nNo users registered yet."
+        keyboard = admin_users_keyboard(0, 1)
+    else:
+        total_pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+        page = max(0, min(page, total_pages - 1))
+        users, _ = await repo.list_users(page, USERS_PER_PAGE)
+        start = page * USERS_PER_PAGE + 1
+        lines = [
+            f"👥 <b>All Users</b> · Page {page + 1}/{total_pages}",
+            f"Total: <b>{total}</b>\n",
+        ]
+        for i, user in enumerate(users, start=start):
+            lines.append(_format_user_line(i, user))
+        text = "\n".join(lines)
+        keyboard = admin_users_keyboard(page, total_pages)
+
+    if isinstance(target, CallbackQuery):
+        await target.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        await target.answer()
+    else:
+        await target.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.message(Command("users"))
+async def admin_users_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    await _send_users_page(message, 0)
+
+
+@router.callback_query(F.data == "admin:menu")
+async def admin_menu_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    await callback.message.edit_text(
+        "🛠 <b>Admin Panel</b>",
+        reply_markup=admin_menu_keyboard(),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:users:"))
+async def admin_users_list(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    page = int(callback.data.split(":", 2)[2])
+    await _send_users_page(callback, page)
 
 
 @router.callback_query(F.data == "admin:stats")
