@@ -14,6 +14,21 @@ GREETINGS = {
 GREETING_RE = re.compile(r"^(hi|hello|hey|hola|sup|yo)\b", re.IGNORECASE)
 
 
+STATUS_QUERIES = {
+    "status",
+    "my status",
+    "account status",
+    "account",
+    "vip status",
+}
+
+
+def is_status_query(text: str | None) -> bool:
+    if not text:
+        return False
+    return text.strip().lower() in STATUS_QUERIES
+
+
 def is_greeting(text: str | None) -> bool:
     if not text:
         return False

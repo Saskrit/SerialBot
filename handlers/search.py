@@ -3,7 +3,7 @@ from aiogram.filters import StateFilter
 from aiogram.types import Message
 
 from database import repository as repo
-from services.greetings import is_greeting
+from services.greetings import is_greeting, is_status_query
 from keyboards.inline import episode_list_keyboard
 from services.messages import build_episode_list_text
 from services.serial_matcher import match_serial
@@ -23,7 +23,8 @@ MENU_BUTTONS = {
     F.text
     & ~F.text.in_(MENU_BUTTONS)
     & ~F.text.startswith("/")
-    & ~F.text.func(is_greeting),
+    & ~F.text.func(is_greeting)
+    & ~F.text.func(is_status_query),
     StateFilter(None),
 )
 async def serial_search(message: Message):
