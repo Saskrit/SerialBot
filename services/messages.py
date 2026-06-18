@@ -3,6 +3,9 @@ from datetime import datetime
 from config import EPISODES_PER_PAGE, FREE_DAILY_LIMIT, TZ, SERIALS_PER_PAGE
 from database import repository as repo
 from database.datetime_utils import ensure_aware
+from services.date_query import UserDateQuery, format_user_date_label
+
+DATE_EPISODES_PER_PAGE = 8
 
 
 def format_date(dt: datetime) -> str:
@@ -216,6 +219,51 @@ async def build_episode_list_text(
         "",
         "Select an episode to watch:",
     ]
+    if (
+        user
+        and user.get("plan") != "vip"
+        and user.get("daily_watches", 0) >= FREE_DAILY_LIMIT
+    ):
+        lines.extend(
+            [
+                "",
+                "🔒 <b>Daily limit reached</b> — locked episodes need VIP or ₹10 unlock.",
+            ]
+        )
+    return "\n".join(lines), total_pages
+
+
+def build_date_episodes_text(
+    episodes: list[dict],
+    query: UserDateQuery,
+    page: int,
+    *,
+    user: dict | None = None,
+) -> tuple[str, int]:
+    label = format_user_date_label(query)
+    if not episodes:
+        return (
+            f"📅 <b>{label}</b>\n\n"
+            "No episodes found for this date.\n"
+            "Try another date or use 📺 Request Episode.",
+            0,
+        )
+
+    total_pages = max(1, (len(episodes) + DATE_EPISODES_PER_PAGE - 1) // DATE_EPISODES_PER_PAGE)
+    page = max(0, min(page, total_pages - 1))
+    start = page * DATE_EPISODES_PER_PAGE
+    page_episodes = episodes[start : start + DATE_EPISODES_PER_PAGE]
+
+    lines = [
+        f"📅 <b>Episodes for {label}</b>",
+        f"<b>{len(episodes)}</b> serial(s) · Page {page + 1}/{total_pages}",
+        "",
+        "Tap a serial to watch:",
+    ]
+    for ep in page_episodes:
+        year_hint = f" · {ep['date'].year}" if not query.year else ""
+        lines.append(f"• <b>{ep.get('serial_name', 'Serial')}</b>{year_hint}")
+
     if (
         user
         and user.get("plan") != "vip"

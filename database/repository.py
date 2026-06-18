@@ -440,6 +440,28 @@ async def list_serials() -> list[dict[str, Any]]:
     return await cursor.to_list(length=200)
 
 
+async def get_episodes_by_date_query(
+    day: int, month: int, year: int | None = None
+) -> list[dict[str, Any]]:
+    db = get_db()
+    if year:
+        start = datetime(year, month, day, tzinfo=TZ)
+        end = start + timedelta(days=1)
+        cursor = db.episodes.find({"date": {"$gte": start, "$lt": end}})
+    else:
+        cursor = db.episodes.find(
+            {
+                "$expr": {
+                    "$and": [
+                        {"$eq": [{"$dayOfMonth": "$date"}, day]},
+                        {"$eq": [{"$month": "$date"}, month]},
+                    ]
+                }
+            }
+        )
+    return await cursor.sort("serial_name", 1).to_list(length=500)
+
+
 async def list_serials_catalog(
     page: int, per_page: int
 ) -> tuple[list[dict[str, Any]], int]:

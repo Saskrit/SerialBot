@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardBu
 
 from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, FREE_DAILY_LIMIT, SERIALS_PER_PAGE, VIP_MONTHLY_PRICE
 from database import repository as repo
-from services.messages import format_date
+from services.messages import DATE_EPISODES_PER_PAGE, format_date
 
 
 def main_menu_keyboard(user: dict | None = None) -> ReplyKeyboardMarkup:
@@ -114,6 +114,62 @@ async def episode_list_keyboard(
         rows.append(
             [InlineKeyboardButton(text="📚 All Serials", callback_data="cat:0")]
         )
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def date_episodes_keyboard(
+    episodes: list[dict],
+    date_key: str,
+    page: int,
+    *,
+    user: dict | None = None,
+) -> InlineKeyboardMarkup:
+    total_pages = max(1, (len(episodes) + DATE_EPISODES_PER_PAGE - 1) // DATE_EPISODES_PER_PAGE)
+    page = max(0, min(page, total_pages - 1))
+    start = page * DATE_EPISODES_PER_PAGE
+    page_episodes = episodes[start : start + DATE_EPISODES_PER_PAGE]
+
+    rows: list[list[InlineKeyboardButton]] = []
+    for ep in page_episodes:
+        ep_id = str(ep["_id"])
+        name = ep.get("serial_name", "Serial")
+        if user and repo.is_episode_locked_for_user(user, ep_id):
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"🔒 {name}",
+                        callback_data=f"locked:{ep_id}",
+                    )
+                ]
+            )
+        else:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"▶ {name}",
+                        callback_data=f"watch:{ep_id}",
+                    )
+                ]
+            )
+
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(
+                text="◀ Prev",
+                callback_data=f"datefind:{date_key}:{page - 1}",
+            )
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="Next ▶",
+                callback_data=f"datefind:{date_key}:{page + 1}",
+            )
+        )
+    if nav:
+        rows.append(nav)
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
