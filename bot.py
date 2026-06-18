@@ -65,7 +65,8 @@ async def stop_web_server() -> None:
 async def run_bot(dp: Dispatcher) -> None:
     bot = create_bot()
     try:
-        logger.info("Serial Hub bot starting polling...")
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook cleared. Starting polling (single instance required).")
         await dp.start_polling(bot, close_bot_session=True)
     finally:
         try:
