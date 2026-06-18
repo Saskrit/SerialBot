@@ -2,7 +2,24 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardBu
 
 from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, FREE_DAILY_LIMIT, SERIALS_PER_PAGE, VIP_MONTHLY_PRICE
 from database import repository as repo
-from services.messages import DATE_EPISODES_PER_PAGE, format_date
+from services.messages import DATE_EPISODES_PER_PAGE, format_date, format_month_year
+
+CLOSE_CALLBACK = "ui:close"
+HOME_CALLBACK = "ui:home"
+
+
+def close_button_row(*, include_home: bool = True) -> list[InlineKeyboardButton]:
+    row: list[InlineKeyboardButton] = []
+    if include_home:
+        row.append(InlineKeyboardButton(text="🏠 Home", callback_data=HOME_CALLBACK))
+    row.append(InlineKeyboardButton(text="❌ Close", callback_data=CLOSE_CALLBACK))
+    return row
+
+
+def append_ui_actions(
+    rows: list[list[InlineKeyboardButton]], *, include_home: bool = True
+) -> None:
+    rows.append(close_button_row(include_home=include_home))
 
 
 def main_menu_keyboard(user: dict | None = None) -> ReplyKeyboardMarkup:
@@ -25,6 +42,7 @@ def main_menu_keyboard(user: dict | None = None) -> ReplyKeyboardMarkup:
                 KeyboardButton(text="📺 Request Episode"),
                 KeyboardButton(text="💬 Support"),
             ],
+            [KeyboardButton(text="❌ Close Menu")],
         ],
         resize_keyboard=True,
     )
@@ -56,6 +74,7 @@ async def serial_catalog_keyboard(page: int) -> InlineKeyboardMarkup:
     if nav:
         rows.append(nav)
 
+    append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -63,10 +82,16 @@ async def episode_list_keyboard(
     serial_slug: str,
     page: int,
     *,
+    year: int,
+    month: int,
     user: dict | None = None,
     show_catalog_back: bool = False,
+    show_month_back: bool = True,
 ) -> InlineKeyboardMarkup:
-    episodes, total = await repo.get_episodes(serial_slug, page, EPISODES_PER_PAGE)
+    episodes, total = await repo.get_episodes_by_month(
+        serial_slug, year, month, page, EPISODES_PER_PAGE
+    )
+    yyyymm = f"{year}{month:02d}"
     rows: list[list[InlineKeyboardButton]] = []
 
     for ep in episodes:
@@ -97,24 +122,76 @@ async def episode_list_keyboard(
         nav.append(
             InlineKeyboardButton(
                 text="◀ Prev",
-                callback_data=f"eps:{serial_slug}:{page - 1}",
+                callback_data=f"epsm:{serial_slug}:{yyyymm}:{page - 1}",
             )
         )
     if page < total_pages - 1:
         nav.append(
             InlineKeyboardButton(
                 text="Next ▶",
-                callback_data=f"eps:{serial_slug}:{page + 1}",
+                callback_data=f"epsm:{serial_slug}:{yyyymm}:{page + 1}",
             )
         )
     if nav:
         rows.append(nav)
+
+    if show_month_back:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="📅 Change Month",
+                    callback_data=f"epsmonth:{serial_slug}",
+                )
+            ]
+        )
 
     if show_catalog_back:
         rows.append(
             [InlineKeyboardButton(text="📚 All Serials", callback_data="cat:0")]
         )
 
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def episode_months_keyboard(
+    serial_slug: str,
+    months: list[dict[str, int]],
+    *,
+    show_catalog_back: bool = False,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for month_info in months:
+        label = (
+            f"📅 {format_month_year(month_info['year'], month_info['month'])} "
+            f"({month_info['count']})"
+        )
+        yyyymm = f"{month_info['year']}{month_info['month']:02d}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"epsm:{serial_slug}:{yyyymm}:0",
+                )
+            ]
+        )
+
+    if show_catalog_back:
+        rows.append(
+            [InlineKeyboardButton(text="📚 All Serials", callback_data="cat:0")]
+        )
+
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def serial_nav_keyboard(*, show_catalog_back: bool = False) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if show_catalog_back:
+        rows.append(
+            [InlineKeyboardButton(text="📚 All Serials", callback_data="cat:0")]
+        )
+    append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -171,27 +248,28 @@ def date_episodes_keyboard(
     if nav:
         rows.append(nav)
 
+    append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def limit_reached_keyboard(episode_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=f"🔓 Unlock Episode · ₹{EPISODE_UNLOCK_PRICE}",
-                    callback_data=f"pay:unlock:{episode_id}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"⭐ VIP Monthly · ₹{VIP_MONTHLY_PRICE}",
-                    callback_data="pay:vip",
-                )
-            ],
-            [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
-        ]
-    )
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"🔓 Unlock Episode · ₹{EPISODE_UNLOCK_PRICE}",
+                callback_data=f"pay:unlock:{episode_id}",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"⭐ VIP Monthly · ₹{VIP_MONTHLY_PRICE}",
+                callback_data="pay:vip",
+            )
+        ],
+        [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
+    ]
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def payment_instructions_keyboard(payment_id: str, bot_username: str) -> InlineKeyboardMarkup:
@@ -216,32 +294,30 @@ def payment_instructions_keyboard(payment_id: str, bot_username: str) -> InlineK
 
 def vip_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
     if user and user.get("plan") == "vip":
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
-                [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
-            ]
-        )
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+        rows = [
+            [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
+            [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
+        ]
+    else:
+        rows = [
             [InlineKeyboardButton(text=f"⭐ Subscribe · ₹{VIP_MONTHLY_PRICE}/mo", callback_data="pay:vip")],
             [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
         ]
-    )
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def plan_keyboard(user: dict | None = None) -> InlineKeyboardMarkup | None:
     if user and user.get("plan") == "vip":
-        return InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
-            ]
-        )
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+        rows = [
+            [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
+        ]
+    else:
+        rows = [
             [InlineKeyboardButton(text=f"⭐ Upgrade to VIP · ₹{VIP_MONTHLY_PRICE}", callback_data="pay:vip")],
         ]
-    )
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def support_categories_keyboard() -> InlineKeyboardMarkup:
@@ -252,27 +328,25 @@ def support_categories_keyboard() -> InlineKeyboardMarkup:
         ("Technical Issue", "support:cat:technical"),
         ("Other", "support:cat:other"),
     ]
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=label, callback_data=cb)] for label, cb in categories
-        ]
-    )
+    rows = [[InlineKeyboardButton(text=label, callback_data=cb)] for label, cb in categories]
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
-            [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
-            [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
-            [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
-            [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
-            [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],
-            [InlineKeyboardButton(text="⭐ Grant VIP", callback_data="admin:grantvip")],
-            [InlineKeyboardButton(text="🗑 Manage Episodes", callback_data="admin:deleps")],
-            [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
-        ]
-    )
+    rows = [
+        [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
+        [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
+        [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
+        [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
+        [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
+        [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],
+        [InlineKeyboardButton(text="⭐ Grant VIP", callback_data="admin:grantvip")],
+        [InlineKeyboardButton(text="🗑 Manage Episodes", callback_data="admin:deleps")],
+        [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
+    ]
+    append_ui_actions(rows, include_home=False)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def admin_users_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
@@ -289,6 +363,7 @@ def admin_users_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
     if nav:
         rows.append(nav)
     rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    append_ui_actions(rows, include_home=False)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -358,6 +433,7 @@ async def admin_episodes_keyboard(
         rows.append(nav)
 
     rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    append_ui_actions(rows, include_home=False)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

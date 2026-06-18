@@ -200,22 +200,34 @@ def build_plan_text(user: dict) -> str:
     return "\n".join(lines)
 
 
+def format_month_year(year: int, month: int) -> str:
+    return datetime(year, month, 1).strftime("%B %Y")
+
+
 async def build_episode_list_text(
-    serial: dict, page: int, user: dict | None = None
+    serial: dict,
+    page: int,
+    user: dict | None = None,
+    *,
+    year: int,
+    month: int,
 ) -> tuple[str, int]:
-    episodes, total = await repo.get_episodes(serial["slug"], page, EPISODES_PER_PAGE)
+    episodes, total = await repo.get_episodes_by_month(
+        serial["slug"], year, month, page, EPISODES_PER_PAGE
+    )
     if total == 0:
         return (
             f"📺 <b>{serial['name']}</b>\n\n"
-            "No episodes uploaded yet.\n"
-            "Use 📺 Request Episode to ask for one.",
+            f"📅 <b>{format_month_year(year, month)}</b>\n\n"
+            "No episodes for this month.",
             0,
         )
 
     total_pages = max(1, (total + EPISODES_PER_PAGE - 1) // EPISODES_PER_PAGE)
     lines = [
         f"📺 <b>{serial['name']}</b>",
-        f"<b>{total}</b> episode(s) available · Page {page + 1}/{total_pages}",
+        f"📅 <b>{format_month_year(year, month)}</b>",
+        f"<b>{total}</b> episode(s) · Page {page + 1}/{total_pages}",
         "",
         "Select an episode to watch:",
     ]
@@ -231,6 +243,18 @@ async def build_episode_list_text(
             ]
         )
     return "\n".join(lines), total_pages
+
+
+def build_episode_months_text(serial: dict, months: list[dict[str, int]]) -> str:
+    total_eps = sum(m["count"] for m in months)
+    lines = [
+        f"📺 <b>{serial['name']}</b>",
+        f"<b>{total_eps}</b> episode(s) available",
+        "",
+        "📅 <b>Filter by month</b>",
+        "Select a month to view episodes:",
+    ]
+    return "\n".join(lines)
 
 
 def build_date_episodes_text(

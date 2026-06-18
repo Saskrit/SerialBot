@@ -4,31 +4,59 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from database import repository as repo
-from keyboards.inline import episode_list_keyboard, limit_reached_keyboard
+from keyboards.inline import limit_reached_keyboard
 from services.episode_delivery import deliver_episode_to_user
-from services.messages import build_episode_list_text
+from services.serial_episodes import (
+    open_serial_episodes,
+    parse_yyyymm,
+    show_serial_episodes_for_month,
+    show_serial_month_picker,
+)
 
 logger = logging.getLogger(__name__)
 
 router = Router()
 
 
-@router.callback_query(F.data.startswith("eps:"))
-async def episode_page(callback: CallbackQuery, db_user: dict):
-    _, serial_slug, page_str = callback.data.split(":", 2)
-    page = int(page_str)
-
+@router.callback_query(F.data.startswith("epsmonth:"))
+async def episode_month_picker(callback: CallbackQuery):
+    serial_slug = callback.data.split(":", 1)[1]
     serial = await repo.get_serial_by_slug(serial_slug)
     if not serial:
         await callback.answer("Serial not found.", show_alert=True)
         return
 
-    text, _ = await build_episode_list_text(serial, page, db_user)
-    keyboard = await episode_list_keyboard(
-        serial_slug, page, user=db_user, show_catalog_back=True
+    await show_serial_month_picker(
+        callback, serial, show_catalog_back=True
     )
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("epsm:"))
+async def episode_month_page(callback: CallbackQuery, db_user: dict):
+    _, serial_slug, yyyymm, page_str = callback.data.split(":", 3)
+    parsed = parse_yyyymm(yyyymm)
+    if not parsed:
+        await callback.answer("Invalid month.", show_alert=True)
+        return
+
+    year, month = parsed
+    serial = await repo.get_serial_by_slug(serial_slug)
+    if not serial:
+        await callback.answer("Serial not found.", show_alert=True)
+        return
+
+    months = await repo.get_episode_months(serial_slug)
+    show_month_back = len(months) > 1
+    await show_serial_episodes_for_month(
+        callback,
+        serial,
+        db_user,
+        year,
+        month,
+        int(page_str),
+        show_catalog_back=True,
+        show_month_back=show_month_back,
+    )
 
 
 async def _send_daily_limit_message(bot, user_id: int, episode_id: str) -> None:

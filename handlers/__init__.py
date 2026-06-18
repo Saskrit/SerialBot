@@ -1,12 +1,13 @@
 from aiogram import Router
 
-from . import admin, browse, episodes, errors, payment, plan, request, search, start, support
+from . import admin, browse, episodes, errors, payment, plan, request, search, start, support, ui
 
 
 def setup_routers() -> Router:
     root = Router()
     root.include_router(errors.router)
     root.include_router(start.router)
+    root.include_router(ui.router)
     root.include_router(plan.router)
     root.include_router(browse.router)
     root.include_router(payment.router)

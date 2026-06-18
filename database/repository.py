@@ -253,6 +253,50 @@ async def get_episodes(serial_slug: str, page: int, per_page: int) -> tuple[list
     return episodes, total
 
 
+async def get_episode_months(serial_slug: str) -> list[dict[str, int]]:
+    db = get_db()
+    pipeline = [
+        {"$match": {"serial_slug": serial_slug}},
+        {
+            "$group": {
+                "_id": {"year": {"$year": "$date"}, "month": {"$month": "$date"}},
+                "count": {"$sum": 1},
+            }
+        },
+        {"$sort": {"_id.year": -1, "_id.month": -1}},
+    ]
+    docs = await db.episodes.aggregate(pipeline).to_list(length=120)
+    return [
+        {
+            "year": doc["_id"]["year"],
+            "month": doc["_id"]["month"],
+            "count": doc["count"],
+        }
+        for doc in docs
+    ]
+
+
+async def get_episodes_by_month(
+    serial_slug: str, year: int, month: int, page: int, per_page: int
+) -> tuple[list[dict], int]:
+    db = get_db()
+    start = datetime(year, month, 1, tzinfo=TZ)
+    if month == 12:
+        end = datetime(year + 1, 1, 1, tzinfo=TZ)
+    else:
+        end = datetime(year, month + 1, 1, tzinfo=TZ)
+    query = {"serial_slug": serial_slug, "date": {"$gte": start, "$lt": end}}
+    total = await db.episodes.count_documents(query)
+    cursor = (
+        db.episodes.find(query)
+        .sort([("date", -1), ("_id", -1)])
+        .skip(page * per_page)
+        .limit(per_page)
+    )
+    episodes = await cursor.to_list(length=per_page)
+    return episodes, total
+
+
 async def get_episode(episode_id: str) -> dict[str, Any] | None:
     if not ObjectId.is_valid(episode_id):
         return None

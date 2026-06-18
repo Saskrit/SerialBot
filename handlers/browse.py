@@ -3,8 +3,9 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from database import repository as repo
-from keyboards.inline import episode_list_keyboard, serial_catalog_keyboard
-from services.messages import build_catalog_text, build_episode_list_text
+from keyboards.inline import serial_catalog_keyboard
+from services.messages import build_catalog_text
+from services.serial_episodes import open_serial_episodes
 
 router = Router()
 
@@ -42,9 +43,6 @@ async def pick_serial(callback: CallbackQuery, db_user: dict):
         await callback.answer("Serial not found.", show_alert=True)
         return
 
-    text, _ = await build_episode_list_text(serial, 0, db_user)
-    keyboard = await episode_list_keyboard(
-        serial_slug, 0, user=db_user, show_catalog_back=True
+    await open_serial_episodes(
+        callback, serial, db_user, show_catalog_back=True
     )
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-    await callback.answer()

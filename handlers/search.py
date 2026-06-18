@@ -3,7 +3,7 @@ from aiogram.filters import StateFilter
 from aiogram.types import CallbackQuery, Message
 
 from database import repository as repo
-from keyboards.inline import date_episodes_keyboard, episode_list_keyboard
+from keyboards.inline import date_episodes_keyboard
 from services.date_query import (
     UserDateQuery,
     decode_date_query,
@@ -11,7 +11,8 @@ from services.date_query import (
     parse_user_date_query,
 )
 from services.greetings import is_greeting, is_status_query
-from services.messages import build_date_episodes_text, build_episode_list_text
+from services.messages import build_date_episodes_text
+from services.serial_episodes import open_serial_episodes
 from services.serial_matcher import match_serial
 
 router = Router()
@@ -24,6 +25,7 @@ MENU_BUTTONS = {
     "✅ VIP Member",
     "📺 Request Episode",
     "💬 Support",
+    "❌ Close Menu",
 }
 
 
@@ -73,11 +75,7 @@ async def serial_search(message: Message, db_user: dict):
         )
         return
 
-    text, _ = await build_episode_list_text(serial, 0, db_user)
-    keyboard = await episode_list_keyboard(
-        serial["slug"], 0, user=db_user, show_catalog_back=False
-    )
-    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    await open_serial_episodes(message, serial, db_user, show_catalog_back=False)
 
 
 @router.callback_query(F.data.startswith("datefind:"))
