@@ -5,7 +5,8 @@ from aiogram.types import CallbackQuery
 
 from database import repository as repo
 from keyboards.inline import episode_list_keyboard, limit_reached_keyboard
-from services.messages import build_episode_list_text, format_date
+from services.episode_delivery import deliver_episode_to_user
+from services.messages import build_episode_list_text
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ async def episode_page(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("watch:"))
 async def watch_episode(callback: CallbackQuery, db_user: dict):
+    user_id = callback.from_user.id
     episode_id = callback.data.split(":", 1)[1]
     episode = await repo.get_episode(episode_id)
     if not episode:
@@ -39,32 +41,26 @@ async def watch_episode(callback: CallbackQuery, db_user: dict):
     allowed, reason = await repo.can_watch_episode(db_user, episode_id)
     if not allowed:
         if reason == "daily_limit":
-            await callback.message.answer(
-                "⏳ <b>Daily limit reached</b>\n\n"
-                "Free users can watch 3 episodes per day.\n"
-                "Unlock this episode for ₹10 or get VIP for unlimited access.",
+            await callback.bot.send_message(
+                chat_id=user_id,
+                text=(
+                    "⏳ <b>Daily limit reached</b>\n\n"
+                    "Free users can watch 3 episodes per day.\n"
+                    "Unlock this episode for ₹10 or get VIP for unlimited access."
+                ),
                 reply_markup=limit_reached_keyboard(episode_id),
                 parse_mode="HTML",
             )
-            await callback.answer()
+            await callback.answer("Check your private chat with the bot.")
             return
         await callback.answer(reason, show_alert=True)
         return
 
-    try:
-        await callback.bot.send_video(
-            chat_id=callback.from_user.id,
-            video=episode["file_id"],
-            caption=(
-                f"📺 <b>{episode.get('serial_name', '')}</b>\n"
-                f"📅 {format_date(episode['date'])}"
-            ),
-            protect_content=True,
-            parse_mode="HTML",
-        )
-    except Exception:
-        logger.exception("Failed to send episode %s", episode_id)
-        await callback.answer("Failed to deliver video. Contact support.", show_alert=True)
+    await callback.answer("Sending episode to your private chat…")
+
+    ok, error = await deliver_episode_to_user(callback.bot, user_id, episode)
+    if not ok:
+        await callback.bot.send_message(chat_id=user_id, text=f"❌ {error}")
         return
 
     counts_toward_limit = (
@@ -72,7 +68,5 @@ async def watch_episode(callback: CallbackQuery, db_user: dict):
         and episode_id not in db_user.get("unlocked_episodes", [])
     )
     if counts_toward_limit:
-        await repo.record_watch(callback.from_user.id, episode_id)
+        await repo.record_watch(user_id, episode_id)
         db_user["daily_watches"] = db_user.get("daily_watches", 0) + 1
-
-    await callback.answer("Episode sent to your chat ✅")

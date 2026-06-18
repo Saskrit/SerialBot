@@ -79,16 +79,22 @@ def limit_reached_keyboard(episode_id: str) -> InlineKeyboardMarkup:
     )
 
 
-def payment_instructions_keyboard(payment_id: str) -> InlineKeyboardMarkup:
+def payment_instructions_keyboard(payment_id: str, bot_username: str) -> InlineKeyboardMarkup:
+    upload_url = f"https://t.me/{bot_username}?start=pay_{payment_id}"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="📸 I've Paid — Send Screenshot",
-                    callback_data=f"pay:screenshot:{payment_id}",
+                    text="📸 Upload Screenshot in Bot",
+                    url=upload_url,
                 )
             ],
-            [InlineKeyboardButton(text="❌ Cancel", callback_data="pay:cancel")],
+            [
+                InlineKeyboardButton(
+                    text="❌ Cancel",
+                    callback_data=f"pay:cancel:{payment_id}",
+                )
+            ],
         ]
     )
 

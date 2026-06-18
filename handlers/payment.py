@@ -1,11 +1,17 @@
-from aiogram import F, Router
+import logging
+
+from aiogram import Bot, F, Router
+from aiogram.enums import ChatType
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from config import ADMIN_IDS, EPISODE_UNLOCK_PRICE, PAYMENT_NAME, UPI_ID, VIP_MONTHLY_PRICE
 from database import repository as repo
-from keyboards.inline import payment_instructions_keyboard
+from keyboards.inline import admin_payment_keyboard, payment_instructions_keyboard
+from services.private_dm import get_bot_username, payment_deep_link, send_private_message
 from states import PaymentStates
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -17,9 +23,79 @@ def payment_instructions(amount: int, payment_type: str) -> str:
         f"Pay via UPI to:\n"
         f"<code>{UPI_ID}</code>\n"
         f"Name: <b>{PAYMENT_NAME}</b>\n\n"
-        "After payment, tap the button below and send your "
-        "transaction screenshot."
+        "After payment, tap <b>Upload Screenshot in Bot</b> below.\n"
+        "Your screenshot will be sent privately — never in a group."
     )
+
+
+async def begin_payment_upload(message: Message, state: FSMContext, payment_id: str) -> None:
+    payment = await repo.get_payment(payment_id)
+    if not payment:
+        await message.answer("❌ Payment not found or expired.")
+        return
+    if payment["user_id"] != message.from_user.id:
+        await message.answer("❌ This payment link belongs to another user.")
+        return
+    if payment["status"] != "pending":
+        await message.answer("ℹ️ This payment was already submitted or reviewed.")
+        return
+
+    await state.set_state(PaymentStates.waiting_screenshot)
+    await state.update_data(payment_id=payment_id)
+
+    label = "Episode Unlock" if payment["type"] == "unlock" else "VIP Monthly"
+    await message.answer(
+        f"📸 <b>Upload Payment Screenshot</b>\n\n"
+        f"Type: <b>{label}</b> · ₹{payment['amount']}\n\n"
+        "Send your UPI transaction screenshot as a <b>photo</b> in this private chat.",
+        parse_mode="HTML",
+    )
+
+
+async def _deliver_payment_flow(
+    callback: CallbackQuery,
+    state: FSMContext,
+    payment_id: str,
+    amount: int,
+    payment_type: str,
+) -> None:
+    user_id = callback.from_user.id
+    bot: Bot = callback.bot
+    username = await get_bot_username(bot)
+    text = payment_instructions(amount, payment_type)
+    keyboard = payment_instructions_keyboard(payment_id, username)
+    in_private = callback.message.chat.type == ChatType.PRIVATE
+
+    if in_private:
+        await state.set_state(PaymentStates.waiting_screenshot)
+        await state.update_data(payment_id=payment_id)
+
+    sent = await send_private_message(
+        bot,
+        user_id,
+        text,
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+    if in_private:
+        if sent:
+            await callback.answer("Check the message above to upload your screenshot.")
+        else:
+            await callback.answer("Could not send payment details.", show_alert=True)
+        return
+
+    if sent:
+        await callback.answer(
+            "💬 Payment details sent to your private chat with the bot.",
+            show_alert=True,
+        )
+    else:
+        link = payment_deep_link(username, payment_id)
+        await callback.answer(
+            f"Start the bot first, then pay: {link}",
+            show_alert=True,
+        )
 
 
 @router.callback_query(F.data.startswith("pay:unlock:"))
@@ -33,15 +109,9 @@ async def pay_unlock(callback: CallbackQuery, state: FSMContext):
     payment_id = await repo.create_payment(
         callback.from_user.id, "unlock", EPISODE_UNLOCK_PRICE, episode_id
     )
-    await state.set_state(PaymentStates.waiting_screenshot)
-    await state.update_data(payment_id=payment_id)
-
-    await callback.message.answer(
-        payment_instructions(EPISODE_UNLOCK_PRICE, "unlock"),
-        reply_markup=payment_instructions_keyboard(payment_id),
-        parse_mode="HTML",
+    await _deliver_payment_flow(
+        callback, state, payment_id, EPISODE_UNLOCK_PRICE, "unlock"
     )
-    await callback.answer()
 
 
 @router.callback_query(F.data == "pay:vip")
@@ -49,42 +119,65 @@ async def pay_vip(callback: CallbackQuery, state: FSMContext):
     payment_id = await repo.create_payment(
         callback.from_user.id, "vip", VIP_MONTHLY_PRICE
     )
-    await state.set_state(PaymentStates.waiting_screenshot)
-    await state.update_data(payment_id=payment_id)
-
-    await callback.message.answer(
-        payment_instructions(VIP_MONTHLY_PRICE, "vip"),
-        reply_markup=payment_instructions_keyboard(payment_id),
-        parse_mode="HTML",
+    await _deliver_payment_flow(
+        callback, state, payment_id, VIP_MONTHLY_PRICE, "vip"
     )
-    await callback.answer()
 
 
-@router.callback_query(F.data.startswith("pay:screenshot:"))
-async def pay_screenshot_prompt(callback: CallbackQuery, state: FSMContext):
-    payment_id = callback.data.split(":", 2)[2]
-    await state.set_state(PaymentStates.waiting_screenshot)
-    await state.update_data(payment_id=payment_id)
-    await callback.message.answer("📸 Send your payment screenshot as a photo.")
-    await callback.answer()
-
-
-@router.callback_query(F.data == "pay:cancel")
+@router.callback_query(F.data.startswith("pay:cancel"))
 async def pay_cancel(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split(":", 2)
+    payment_id = parts[2] if len(parts) > 2 else None
+
+    if payment_id:
+        payment = await repo.get_payment(payment_id)
+        if payment and payment["user_id"] != callback.from_user.id:
+            await callback.answer("Unauthorized.", show_alert=True)
+            return
+
     await state.clear()
-    await callback.message.answer("Payment cancelled.")
-    await callback.answer()
+    await send_private_message(
+        callback.bot,
+        callback.from_user.id,
+        "❌ Payment cancelled.",
+    )
+    await callback.answer("Payment cancelled.")
 
 
-@router.message(PaymentStates.waiting_screenshot, F.photo)
+def _extract_screenshot_file_id(message: Message) -> str | None:
+    if message.photo:
+        return message.photo[-1].file_id
+    if message.document and message.document.mime_type and message.document.mime_type.startswith(
+        "image/"
+    ):
+        return message.document.file_id
+    return None
+
+
+@router.message(
+    PaymentStates.waiting_screenshot,
+    F.chat.type == ChatType.PRIVATE,
+    F.photo | F.document,
+)
 async def receive_screenshot(message: Message, state: FSMContext):
+    file_id = _extract_screenshot_file_id(message)
+    if not file_id:
+        await message.answer("Please send your payment screenshot as a photo.")
+        return
+
     data = await state.get_data()
     payment_id = data.get("payment_id")
     if not payment_id:
         await state.clear()
+        await message.answer("No active payment. Use Get VIP or unlock an episode first.")
         return
 
-    file_id = message.photo[-1].file_id
+    payment = await repo.get_payment(payment_id)
+    if not payment or payment["user_id"] != message.from_user.id:
+        await state.clear()
+        await message.answer("Invalid payment session.")
+        return
+
     attached = await repo.attach_payment_screenshot(payment_id, file_id)
     if not attached:
         await message.answer("Payment not found or already submitted.")
@@ -101,8 +194,6 @@ async def receive_screenshot(message: Message, state: FSMContext):
         f"Type: <b>{payment['type']}</b> · ₹{payment['amount']}"
     )
 
-    from keyboards.inline import admin_payment_keyboard
-
     for admin_id in ADMIN_IDS:
         try:
             await message.bot.send_photo(
@@ -116,12 +207,16 @@ async def receive_screenshot(message: Message, state: FSMContext):
             pass
 
     await message.answer(
-        "✅ Screenshot received!\n"
+        "✅ Screenshot received privately!\n"
         "An admin will review your payment shortly."
     )
     await state.clear()
 
 
-@router.message(PaymentStates.waiting_screenshot)
+@router.message(PaymentStates.waiting_screenshot, F.chat.type == ChatType.PRIVATE)
 async def screenshot_expected(message: Message):
-    await message.answer("Please send a photo screenshot of your payment.")
+    await message.answer(
+        "📸 Please send your payment screenshot as a <b>photo</b> in this chat.\n"
+        "Do not upload it in a group — only here in private with the bot.",
+        parse_mode="HTML",
+    )
