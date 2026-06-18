@@ -129,7 +129,13 @@ async def parse_upload_caption(caption: str) -> tuple[dict | None, datetime | No
     serial_query, date_str = parts
     serial = await _resolve_serial(serial_query)
     if not serial:
-        return None, None, f"Unknown serial: <b>{serial_query}</b>"
+        return (
+            None,
+            None,
+            f"Unknown serial: <b>{serial_query}</b>\n\n"
+            "Create it first with:\n"
+            f"<code>/addserial {serial_query}</code>",
+        )
 
     episode_date = parse_episode_date(date_str)
     if not episode_date:

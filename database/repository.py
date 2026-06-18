@@ -534,6 +534,39 @@ async def get_serial_by_slug(slug: str) -> dict[str, Any] | None:
     return await get_db().serials.find_one({"slug": slug})
 
 
+async def create_serial(
+    name: str, aliases: list[str] | None = None
+) -> tuple[dict[str, Any] | None, str]:
+    from services.serial_utils import slugify_serial_name
+
+    clean_name = name.strip()
+    if not clean_name:
+        return None, "Serial name cannot be empty."
+
+    slug = slugify_serial_name(clean_name)
+    if not slug:
+        return None, "Could not generate a slug from that name."
+
+    existing = await get_serial_by_slug(slug)
+    if existing:
+        return None, (
+            f"Serial already exists: <b>{existing['name']}</b> "
+            f"(<code>{slug}</code>)"
+        )
+
+    clean_aliases = list(
+        dict.fromkeys(alias.strip() for alias in (aliases or []) if alias.strip())
+    )
+    doc = {
+        "name": clean_name,
+        "slug": slug,
+        "aliases": clean_aliases,
+        "active": True,
+    }
+    await get_db().serials.insert_one(doc)
+    return doc, ""
+
+
 async def list_serials() -> list[dict[str, Any]]:
     cursor = get_db().serials.find({"active": True}).sort("name", 1)
     return await cursor.to_list(length=200)

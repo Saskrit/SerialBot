@@ -21,7 +21,7 @@ from keyboards.inline import (
 )
 from services.messages import format_date
 from services.episode_upload import save_episode_from_addepisode, save_episode_from_message
-from services.upload_parser import parse_episode_date
+from services.serial_utils import parse_add_serial_input
 from services import admin_actions
 from services.settings import format_free_limit_label, get_free_daily_limit, set_free_daily_limit
 from states import AdminStates
@@ -85,6 +85,8 @@ async def storage_info(message: Message):
             "<code>Laughter Chef 3 | 17 June 2026</code>",
             "<code>laughter-chef-3 | 17-06-2026</code>",
             "",
+            "<b>New serial?</b> Use <code>/addserial Serial Name</code> first.",
+            "",
             "In your <b>private storage channel</b>:",
             "1. Post video with caption, or edit caption later",
             "2. Reply to video with <code>/addepisode</code>",
@@ -93,6 +95,80 @@ async def storage_info(message: Message):
         ]
     )
     await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+def _add_serial_usage() -> str:
+    return (
+        "➕ <b>Add Serial</b>\n\n"
+        "Usage:\n"
+        "<code>/addserial Seher Hone Ko Hai</code>\n"
+        "<code>/addserial Seher Hone Ko Hai | seher, shk</code>\n\n"
+        "Aliases are optional (comma-separated after <code>|</code>).\n"
+        "Then upload episodes with caption:\n"
+        "<code>Seher Hone Ko Hai | 18 June 2026</code>"
+    )
+
+
+async def _add_serial_from_text(
+    message: Message, raw: str, state: FSMContext | None = None
+) -> None:
+    name, aliases = parse_add_serial_input(raw)
+    if not name:
+        await message.answer("Please send a serial name.", parse_mode="HTML")
+        return
+
+    serial, error = await repo.create_serial(name, aliases)
+    if error:
+        await message.answer(f"❌ {error}", parse_mode="HTML")
+        return
+
+    if state:
+        await state.clear()
+
+    alias_line = ""
+    if serial.get("aliases"):
+        alias_line = f"\nAliases: <code>{', '.join(serial['aliases'])}</code>"
+
+    await message.answer(
+        "✅ <b>Serial created</b>\n\n"
+        f"Name: <b>{serial['name']}</b>\n"
+        f"Slug: <code>{serial['slug']}</code>{alias_line}\n\n"
+        "Upload episodes in the storage channel with caption:\n"
+        f"<code>{serial['name']} | 18 June 2026</code>",
+        reply_markup=admin_menu_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("addserial"))
+async def add_serial_cmd(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await state.set_state(AdminStates.add_serial_name)
+        await message.answer(_add_serial_usage(), parse_mode="HTML")
+        return
+
+    await _add_serial_from_text(message, parts[1], state)
+
+
+@router.callback_query(F.data == "admin:addserial")
+async def admin_add_serial_start(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    await state.set_state(AdminStates.add_serial_name)
+    await callback.message.answer(_add_serial_usage(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.message(AdminStates.add_serial_name)
+async def admin_add_serial_name(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    await _add_serial_from_text(message, message.text.strip(), state)
 
 
 @router.message(Command("episodes"))
