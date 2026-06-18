@@ -4,6 +4,7 @@ from datetime import datetime
 from aiogram.types import Message
 
 from database import repository as repo
+from services.episode_notifications import schedule_new_episode_notification
 from services.messages import format_date
 from services.upload_parser import parse_episode_date, parse_upload_caption
 
@@ -77,14 +78,25 @@ async def save_episode_from_message(
         f"ID: <code>{ep_id}</code>"
     )
 
-    if notify and message.bot:
-        from config import ADMIN_IDS
+    if message.bot:
+        if created:
+            schedule_new_episode_notification(
+                message.bot,
+                serial["name"],
+                serial["slug"],
+                episode_date,
+                ep_id,
+            )
+            success_text += "\n\n📢 Users are being notified."
 
-        for admin_id in ADMIN_IDS:
-            try:
-                await message.bot.send_message(admin_id, success_text, parse_mode="HTML")
-            except Exception:
-                pass
+        if notify:
+            from config import ADMIN_IDS
+
+            for admin_id in ADMIN_IDS:
+                try:
+                    await message.bot.send_message(admin_id, success_text, parse_mode="HTML")
+                except Exception:
+                    pass
 
     return True, success_text
 
@@ -160,7 +172,17 @@ async def _save_from_parsed(
         message_id=video_message.message_id,
     )
     action = "saved" if created else "updated"
-    return True, (
+    success_text = (
         f"✅ Episode {action}: <b>{serial['name']}</b> — "
         f"{format_date(episode_date)} (<code>{ep_id}</code>)"
     )
+    if created and video_message.bot:
+        schedule_new_episode_notification(
+            video_message.bot,
+            serial["name"],
+            serial["slug"],
+            episode_date,
+            ep_id,
+        )
+        success_text += "\n\n📢 Users are being notified."
+    return True, success_text

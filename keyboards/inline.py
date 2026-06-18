@@ -333,6 +333,17 @@ def support_categories_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def new_episode_notification_keyboard(
+    serial_slug: str, episode_id: str
+) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text="▶ Watch Now", callback_data=f"watch:{episode_id}")],
+        [InlineKeyboardButton(text="📺 View Serial", callback_data=f"pick:{serial_slug}")],
+    ]
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],

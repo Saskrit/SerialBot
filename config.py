@@ -49,6 +49,12 @@ EPISODES_PER_PAGE = 5
 SERIALS_PER_PAGE = 10
 MIN_ARCHIVE_EPISODES = 20
 
+NOTIFY_ON_NEW_EPISODE = os.getenv("NOTIFY_ON_NEW_EPISODE", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 TZ = timezone.utc
 
 
