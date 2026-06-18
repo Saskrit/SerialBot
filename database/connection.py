@@ -3,7 +3,7 @@ import logging
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from config import MONGODB_DB, MONGODB_URI
-from database.seed import seed_serials
+from database.seed import refresh_serial_catalog, seed_serials
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,9 @@ async def init_db() -> AsyncIOMotorDatabase:
 
     inserted = await seed_serials(db)
     if inserted:
-        logger.info("Seeded %s serials into database", inserted)
+        logger.info("Seeded %s new serials into database", inserted)
+
+    await refresh_serial_catalog(db)
 
     logger.info("Connected to MongoDB database: %s", MONGODB_DB)
     return db

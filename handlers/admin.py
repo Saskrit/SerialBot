@@ -1,17 +1,16 @@
 import logging
-import re
-from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from config import ADMIN_IDS, STORAGE_CHANNEL_ID, TZ
+from config import ADMIN_IDS, STORAGE_CHANNEL_ID
 from database import repository as repo
 from database.connection import get_db
 from keyboards.inline import admin_menu_keyboard, admin_user_keyboard, admin_users_keyboard
 from services.messages import format_date
+from services.upload_parser import parse_episode_date, parse_upload_caption
 from states import AdminStates
 
 logger = logging.getLogger(__name__)
@@ -21,6 +20,112 @@ router = Router()
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
+
+
+async def _notify_admins(bot, text: str) -> None:
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, text, parse_mode="HTML")
+        except Exception:
+            pass
+
+
+def _is_storage_chat(message: Message) -> bool:
+    return bool(STORAGE_CHANNEL_ID and message.chat.id == STORAGE_CHANNEL_ID)
+
+
+async def process_storage_upload(message: Message) -> None:
+    if not _is_storage_chat(message):
+        return
+
+    if not (message.video or message.document):
+        return
+
+    caption = message.caption or ""
+    serial, episode_date, error = await parse_upload_caption(caption)
+    if error or not serial or not episode_date:
+        logger.warning("Storage upload failed: %s | caption=%r", error, caption)
+        preview = caption[:300] if caption else "(no caption)"
+        await _notify_admins(
+            message.bot,
+            f"❌ <b>Storage upload failed</b>\n\n"
+            f"Caption: <code>{preview}</code>\n\n{error}",
+        )
+        return
+
+    file_id = message.video.file_id if message.video else message.document.file_id
+    unique_id = (
+        message.video.file_unique_id if message.video else message.document.file_unique_id
+    )
+
+    ep_id = await repo.add_episode(
+        serial_slug=serial["slug"],
+        serial_name=serial["name"],
+        episode_date=episode_date,
+        file_id=file_id,
+        file_unique_id=unique_id,
+        message_id=message.message_id,
+    )
+    logger.info("Episode saved: %s — %s (%s)", serial["name"], episode_date, ep_id)
+    await _notify_admins(
+        message.bot,
+        f"✅ <b>Episode saved</b>\n"
+        f"Serial: <b>{serial['name']}</b>\n"
+        f"Date: {format_date(episode_date)}\n"
+        f"ID: <code>{ep_id}</code>",
+    )
+
+
+@router.message(Command("storageinfo"))
+async def storage_info(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    lines = [
+        "📦 <b>Storage setup</b>",
+        f"Configured ID: <code>{STORAGE_CHANNEL_ID or 'not set'}</code>",
+    ]
+    if message.chat.type in ("channel", "supergroup", "group"):
+        lines.append(f"This chat ID: <code>{message.chat.id}</code>")
+
+    lines.extend(
+        [
+            "",
+            "<b>Caption format:</b>",
+            "<code>Laughter Chef 3 | 17 June 2026</code>",
+            "<code>laughter-chef-3 | 17-06-2026</code>",
+            "",
+            "Bot must be <b>admin</b> in the storage channel/group.",
+        ]
+    )
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("episodes"))
+async def list_episodes_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("Usage: /episodes laughter-chef-3")
+        return
+
+    slug = args[1].strip().lower().replace(" ", "-")
+    serial = await repo.get_serial_by_slug(slug)
+    if not serial:
+        await message.answer(f"Serial '{slug}' not found.")
+        return
+
+    episodes, total = await repo.get_episodes(slug, 0, 10)
+    if total == 0:
+        await message.answer(f"No episodes for <b>{serial['name']}</b> in database.", parse_mode="HTML")
+        return
+
+    lines = [f"📺 <b>{serial['name']}</b> — {total} episode(s)\n"]
+    for ep in episodes:
+        lines.append(f"• {format_date(ep['date'])} — <code>{ep['_id']}</code>")
+    await message.answer("\n".join(lines), parse_mode="HTML")
 
 
 @router.message(Command("admin"))
@@ -393,89 +498,16 @@ async def admin_support(callback: CallbackQuery):
     await callback.answer()
 
 
-def parse_episode_date(text: str) -> datetime | None:
-    patterns = [
-        r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})",
-        r"(\d{1,2})\s+(\w+)\s+(\d{4})",
-    ]
-    months = {
-        "january": 1, "february": 2, "march": 3, "april": 4,
-        "may": 5, "june": 6, "july": 7, "august": 8,
-        "september": 9, "october": 10, "november": 11, "december": 12,
-        "jan": 1, "feb": 2, "mar": 3, "apr": 4,
-        "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-    }
-
-    text = text.strip()
-
-    m = re.match(patterns[0], text)
-    if m:
-        day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        try:
-            return datetime(year, month, day, tzinfo=TZ)
-        except ValueError:
-            return None
-
-    m = re.match(patterns[1], text, re.IGNORECASE)
-    if m:
-        day = int(m.group(1))
-        month_name = m.group(2).lower()
-        year = int(m.group(3))
-        month = months.get(month_name)
-        if month:
-            try:
-                return datetime(year, month, day, tzinfo=TZ)
-            except ValueError:
-                return None
-    return None
-
-
 @router.channel_post(F.video | F.document)
 async def storage_channel_upload(message: Message):
-    if not STORAGE_CHANNEL_ID or message.chat.id != STORAGE_CHANNEL_ID:
-        return
+    await process_storage_upload(message)
 
-    caption = message.caption or ""
-    if not caption.strip():
-        return
 
-    parts = caption.strip().split("|")
-    if len(parts) < 2:
-        parts = caption.strip().split()
-        if len(parts) < 2:
-            return
-        serial_query = parts[0]
-        date_str = " ".join(parts[1:])
-    else:
-        serial_query = parts[0].strip()
-        date_str = parts[1].strip()
+if STORAGE_CHANNEL_ID:
 
-    from services.serial_matcher import match_serial
-
-    serial = await match_serial(serial_query)
-    if not serial:
-        logger.warning("Unknown serial in channel upload: %s", serial_query)
-        return
-
-    episode_date = parse_episode_date(date_str)
-    if not episode_date:
-        logger.warning("Could not parse date: %s", date_str)
-        return
-
-    file_id = message.video.file_id if message.video else message.document.file_id
-    unique_id = (
-        message.video.file_unique_id if message.video else message.document.file_unique_id
-    )
-
-    await repo.add_episode(
-        serial_slug=serial["slug"],
-        serial_name=serial["name"],
-        episode_date=episode_date,
-        file_id=file_id,
-        file_unique_id=unique_id,
-        message_id=message.message_id,
-    )
-    logger.info("Episode saved: %s — %s", serial["name"], date_str)
+    @router.message(F.chat.id == STORAGE_CHANNEL_ID, F.video | F.document)
+    async def storage_group_upload(message: Message):
+        await process_storage_upload(message)
 
 
 @router.message(Command("addepisode"))

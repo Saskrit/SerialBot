@@ -77,7 +77,7 @@ SERIALS = [
   {
     "name": "Laughter Chef 3",
     "slug": "laughter-chef-3",
-    "aliases": ["laughter chef", "laughter"],
+    "aliases": ["laughter chef", "laughter", "laughter chef 3", "lc3"],
   },
   {
     "name": "Vasudha",
@@ -170,3 +170,18 @@ async def seed_serials(database) -> int:
         if result.upserted_id is not None:
             count += 1
     return count
+
+
+async def refresh_serial_catalog(database) -> None:
+    for serial in SERIALS:
+        await database.serials.update_one(
+            {"slug": serial["slug"]},
+            {
+                "$set": {
+                    "name": serial["name"],
+                    "aliases": serial["aliases"],
+                    "active": True,
+                }
+            },
+            upsert=True,
+        )
