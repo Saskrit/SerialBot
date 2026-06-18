@@ -16,7 +16,7 @@ async def _reply_status(message: Message, db_user: dict) -> None:
     is_admin = message.from_user.id in ADMIN_IDS
     await message.answer(
         build_status_text(db_user, is_admin=is_admin),
-        reply_markup=plan_keyboard(),
+        reply_markup=plan_keyboard(db_user),
         parse_mode="HTML",
     )
 
@@ -36,7 +36,7 @@ async def cmd_start(
     is_admin = message.from_user.id in ADMIN_IDS
     await message.answer(
         build_user_info_text(db_user, is_admin=is_admin),
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(db_user),
         parse_mode="HTML",
     )
 
@@ -46,7 +46,7 @@ async def greeting(message: Message, db_user: dict):
     is_admin = message.from_user.id in ADMIN_IDS
     await message.answer(
         build_user_info_text(db_user, is_admin=is_admin),
-        reply_markup=plan_keyboard(),
+        reply_markup=plan_keyboard(db_user),
         parse_mode="HTML",
     )
 

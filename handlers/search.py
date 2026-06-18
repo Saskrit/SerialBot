@@ -15,6 +15,7 @@ MENU_BUTTONS = {
     "📚 Browse Serials",
     "📋 My Plan",
     "⭐ Get VIP",
+    "✅ VIP Member",
     "📺 Request Episode",
     "💬 Support",
 }
@@ -28,7 +29,7 @@ MENU_BUTTONS = {
     & ~F.text.func(is_status_query),
     StateFilter(None),
 )
-async def serial_search(message: Message):
+async def serial_search(message: Message, db_user: dict):
     serial = await match_serial(message.text)
     if not serial:
         serials = await repo.list_serials()
@@ -40,8 +41,10 @@ async def serial_search(message: Message):
         )
         return
 
-    text, _ = await build_episode_list_text(serial, 0)
-    keyboard = await episode_list_keyboard(serial["slug"], 0, show_catalog_back=False)
+    text, _ = await build_episode_list_text(serial, 0, db_user)
+    keyboard = await episode_list_keyboard(
+        serial["slug"], 0, user=db_user, show_catalog_back=False
+    )
     await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 

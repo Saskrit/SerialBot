@@ -22,18 +22,19 @@ async def get_or_create_user(
     user = await db.users.find_one({"telegram_id": telegram_id})
 
     if user:
+        fields: dict[str, Any] = {"last_active": now}
+        if username is not None:
+            fields["username"] = username
+        if first_name is not None:
+            fields["first_name"] = first_name
         await db.users.update_one(
             {"telegram_id": telegram_id},
-            {
-                "$set": {
-                    "username": username,
-                    "first_name": first_name,
-                    "last_active": now,
-                }
-            },
+            {"$set": fields},
         )
-        user["username"] = username
-        user["first_name"] = first_name
+        if username is not None:
+            user["username"] = username
+        if first_name is not None:
+            user["first_name"] = first_name
         user["last_active"] = now
         return normalize_user_datetimes(await _normalize_daily_usage(user))
 
@@ -118,16 +119,31 @@ async def record_watch(telegram_id: int, episode_id: str) -> None:
 
 async def grant_vip(telegram_id: int, days: int = 30) -> datetime:
     now = datetime.now(TZ)
-    user = await get_user(telegram_id)
+    db = get_db()
+    user = await db.users.find_one({"telegram_id": telegram_id})
     base = now
     if user:
+        user = normalize_user_datetimes(await _normalize_daily_usage(user))
         current_expires = ensure_aware(user.get("vip_expires"))
         if current_expires and current_expires > now:
             base = current_expires
     expires = base + timedelta(days=days)
-    await get_db().users.update_one(
+    await db.users.update_one(
         {"telegram_id": telegram_id},
-        {"$set": {"plan": "vip", "vip_expires": expires}},
+        {
+            "$set": {"plan": "vip", "vip_expires": expires, "last_active": now},
+            "$setOnInsert": {
+                "telegram_id": telegram_id,
+                "username": None,
+                "first_name": None,
+                "daily_watches": 0,
+                "daily_reset_date": _today().isoformat(),
+                "unlocked_episodes": [],
+                "banned": False,
+                "registered_at": now,
+            },
+        },
+        upsert=True,
     )
     return expires
 
@@ -150,13 +166,21 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
     if user.get("plan") == "vip":
         return True, ""
 
-    if await has_episode_unlock(user, episode_id):
+    if episode_id in user.get("unlocked_episodes", []):
         return True, ""
 
     if user.get("daily_watches", 0) >= FREE_DAILY_LIMIT:
         return False, "daily_limit"
 
     return True, ""
+
+
+def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> bool:
+    if user.get("plan") == "vip":
+        return False
+    if episode_id in user.get("unlocked_episodes", []):
+        return False
+    return user.get("daily_watches", 0) >= FREE_DAILY_LIMIT
 
 
 async def get_user_stats() -> dict[str, int]:

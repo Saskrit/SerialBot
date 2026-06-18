@@ -35,14 +35,16 @@ async def browse_catalog_page(callback: CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("pick:"))
-async def pick_serial(callback: CallbackQuery):
+async def pick_serial(callback: CallbackQuery, db_user: dict):
     serial_slug = callback.data.split(":", 1)[1]
     serial = await repo.get_serial_by_slug(serial_slug)
     if not serial:
         await callback.answer("Serial not found.", show_alert=True)
         return
 
-    text, _ = await build_episode_list_text(serial, 0)
-    keyboard = await episode_list_keyboard(serial_slug, 0, show_catalog_back=True)
+    text, _ = await build_episode_list_text(serial, 0, db_user)
+    keyboard = await episode_list_keyboard(
+        serial_slug, 0, user=db_user, show_catalog_back=True
+    )
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()

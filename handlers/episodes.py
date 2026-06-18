@@ -14,7 +14,7 @@ router = Router()
 
 
 @router.callback_query(F.data.startswith("eps:"))
-async def episode_page(callback: CallbackQuery):
+async def episode_page(callback: CallbackQuery, db_user: dict):
     _, serial_slug, page_str = callback.data.split(":", 2)
     page = int(page_str)
 
@@ -23,10 +23,42 @@ async def episode_page(callback: CallbackQuery):
         await callback.answer("Serial not found.", show_alert=True)
         return
 
-    text, _ = await build_episode_list_text(serial, page)
-    keyboard = await episode_list_keyboard(serial_slug, page, show_catalog_back=True)
+    text, _ = await build_episode_list_text(serial, page, db_user)
+    keyboard = await episode_list_keyboard(
+        serial_slug, page, user=db_user, show_catalog_back=True
+    )
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
+
+
+async def _send_daily_limit_message(bot, user_id: int, episode_id: str) -> None:
+    await bot.send_message(
+        chat_id=user_id,
+        text=(
+            "⏳ <b>Daily limit reached</b>\n\n"
+            "Free users can watch 3 episodes per day.\n"
+            "Unlock this episode for ₹10 or get VIP for unlimited access."
+        ),
+        reply_markup=limit_reached_keyboard(episode_id),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("locked:"))
+async def locked_episode(callback: CallbackQuery, db_user: dict):
+    episode_id = callback.data.split(":", 1)[1]
+    allowed, reason = await repo.can_watch_episode(db_user, episode_id)
+    if allowed:
+        episode = await repo.get_episode(episode_id)
+        if episode:
+            await callback.answer("Sending episode to your private chat…")
+            ok, error = await deliver_episode_to_user(callback.bot, callback.from_user.id, episode)
+            if not ok:
+                await callback.bot.send_message(chat_id=callback.from_user.id, text=f"❌ {error}")
+            return
+
+    await _send_daily_limit_message(callback.bot, callback.from_user.id, episode_id)
+    await callback.answer("Daily limit reached — check your private chat.")
 
 
 @router.callback_query(F.data.startswith("watch:"))
@@ -41,16 +73,7 @@ async def watch_episode(callback: CallbackQuery, db_user: dict):
     allowed, reason = await repo.can_watch_episode(db_user, episode_id)
     if not allowed:
         if reason == "daily_limit":
-            await callback.bot.send_message(
-                chat_id=user_id,
-                text=(
-                    "⏳ <b>Daily limit reached</b>\n\n"
-                    "Free users can watch 3 episodes per day.\n"
-                    "Unlock this episode for ₹10 or get VIP for unlimited access."
-                ),
-                reply_markup=limit_reached_keyboard(episode_id),
-                parse_mode="HTML",
-            )
+            await _send_daily_limit_message(callback.bot, user_id, episode_id)
             await callback.answer("Check your private chat with the bot.")
             return
         await callback.answer(reason, show_alert=True)

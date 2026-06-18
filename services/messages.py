@@ -15,7 +15,7 @@ def format_datetime(dt: datetime) -> str:
 
 def plan_label(user: dict) -> str:
     if user.get("plan") == "vip":
-        return "VIP Monthly"
+        return "VIP Member"
     return "Free Tier"
 
 
@@ -70,7 +70,7 @@ def build_status_text(user: dict, *, is_admin: bool = False) -> str:
         lines.append(f"Member since: {format_date(registered)}")
 
     if user.get("plan") == "vip":
-        lines.extend(["", "⭐ <b>VIP Membership</b>"])
+        lines.extend(["", "⭐ <b>You are a VIP Member</b>"])
         expires = ensure_aware(user.get("vip_expires"))
         if expires:
             lines.append(f"Expires on: <b>{format_datetime(expires)}</b>")
@@ -78,7 +78,7 @@ def build_status_text(user: dict, *, is_admin: bool = False) -> str:
             if remaining:
                 lines.append(f"Time remaining: <b>{remaining}</b>")
         else:
-            lines.append("Status: <b>Active VIP</b>")
+            lines.append("Unlimited episodes · full archive access")
 
     unlocks = user.get("unlocked_episodes", [])
     if unlocks:
@@ -119,12 +119,24 @@ def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
     if registered:
         lines.append(f"Member since: {format_date(registered)}")
 
-    if user.get("plan") == "vip" and user.get("vip_expires"):
-        lines.append(f"VIP expires: <b>{format_date(user['vip_expires'])}</b>")
-
-    unlocks = user.get("unlocked_episodes", [])
-    if unlocks:
-        lines.append(f"Unlocked episodes: <b>{len(unlocks)}</b>")
+    if user.get("plan") == "vip":
+        lines.extend(
+            [
+                "",
+                "⭐ <b>You are a VIP Member</b>",
+                "Unlimited episodes · full archive access",
+            ]
+        )
+        expires = ensure_aware(user.get("vip_expires"))
+        if expires:
+            lines.append(f"VIP expires: <b>{format_date(expires)}</b>")
+            remaining = _vip_time_remaining(user)
+            if remaining:
+                lines.append(f"Time remaining: <b>{remaining}</b>")
+    else:
+        unlocks = user.get("unlocked_episodes", [])
+        if unlocks:
+            lines.append(f"Unlocked episodes: <b>{len(unlocks)}</b>")
 
     lines.extend(
         [
@@ -140,6 +152,25 @@ def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
 
 
 def build_plan_text(user: dict) -> str:
+    if user.get("plan") == "vip":
+        lines = [
+            "📋 <b>My Plan</b>",
+            "",
+            "⭐ <b>You are a VIP Member</b>",
+            "",
+            "✅ Unlimited episodes daily",
+            "✅ Full archive access",
+            "✅ Episode request priority",
+            "✅ Priority support",
+        ]
+        expires = ensure_aware(user.get("vip_expires"))
+        if expires:
+            lines.append(f"\nValid until: <b>{format_date(expires)}</b>")
+            remaining = _vip_time_remaining(user)
+            if remaining:
+                lines.append(f"Time remaining: <b>{remaining}</b>")
+        return "\n".join(lines)
+
     lines = [
         "📋 <b>My Plan</b>",
         "",
@@ -150,9 +181,6 @@ def build_plan_text(user: dict) -> str:
     registered = user.get("registered_at")
     if registered:
         lines.append(f"Registered: {format_date(registered)}")
-
-    if user.get("plan") == "vip" and user.get("vip_expires"):
-        lines.append(f"VIP expires: <b>{format_date(user['vip_expires'])}</b>")
 
     unlocks = user.get("unlocked_episodes", [])
     if unlocks:
@@ -169,7 +197,9 @@ def build_plan_text(user: dict) -> str:
     return "\n".join(lines)
 
 
-async def build_episode_list_text(serial: dict, page: int) -> tuple[str, int]:
+async def build_episode_list_text(
+    serial: dict, page: int, user: dict | None = None
+) -> tuple[str, int]:
     episodes, total = await repo.get_episodes(serial["slug"], page, EPISODES_PER_PAGE)
     if total == 0:
         return (
@@ -186,6 +216,17 @@ async def build_episode_list_text(serial: dict, page: int) -> tuple[str, int]:
         "",
         "Select an episode to watch:",
     ]
+    if (
+        user
+        and user.get("plan") != "vip"
+        and user.get("daily_watches", 0) >= FREE_DAILY_LIMIT
+    ):
+        lines.extend(
+            [
+                "",
+                "🔒 <b>Daily limit reached</b> — locked episodes need VIP or ₹10 unlock.",
+            ]
+        )
     return "\n".join(lines), total_pages
 
 

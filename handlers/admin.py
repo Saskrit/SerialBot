@@ -309,7 +309,7 @@ USERS_PER_PAGE = 15
 
 
 def _format_user_line(index: int, user: dict) -> str:
-    name = user.get("first_name") or "Unknown"
+    name = user.get("first_name") or user.get("username") or "Unknown"
     username = user.get("username")
     user_label = f"{name} (@{username})" if username else name
     plan = "VIP" if user.get("plan") == "vip" else "Free"
@@ -450,8 +450,8 @@ async def approve_payment(callback: CallbackQuery):
         expires = await repo.grant_vip(user_id)
         await callback.bot.send_message(
             user_id,
-            f"⭐ <b>VIP activated!</b>\n"
-            f"Valid until {format_date(expires)}.",
+            "⭐ <b>You are now a VIP Member!</b>\n\n"
+            f"Unlimited episodes until <b>{format_date(expires)}</b>.",
             parse_mode="HTML",
         )
     elif payment["type"] == "unlock" and payment.get("episode_id"):
@@ -564,12 +564,12 @@ async def admin_user_lookup(message: Message, state: FSMContext):
 
 
 async def _apply_vip_grant(bot, telegram_id: int, days: int = 30) -> datetime:
-    await repo.get_or_create_user(telegram_id)
     expires = await repo.grant_vip(telegram_id, days)
     try:
         await bot.send_message(
             telegram_id,
-            f"⭐ <b>VIP activated!</b>\nValid until {format_date(expires)}.",
+            "⭐ <b>You are now a VIP Member!</b>\n\n"
+            f"Unlimited episodes until <b>{format_date(expires)}</b>.",
             parse_mode="HTML",
         )
     except Exception:
