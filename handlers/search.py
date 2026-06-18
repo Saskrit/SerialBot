@@ -36,9 +36,9 @@ async def _send_date_episodes(
     page: int = 0,
 ) -> None:
     episodes = await repo.get_episodes_by_date_query(query.day, query.month, query.year)
-    text, _ = build_date_episodes_text(episodes, query, page, user=db_user)
+    text, _ = await build_date_episodes_text(episodes, query, page, user=db_user)
     date_key = encode_date_query(query)
-    keyboard = date_episodes_keyboard(episodes, date_key, page, user=db_user)
+    keyboard = await date_episodes_keyboard(episodes, date_key, page, user=db_user)
 
     if isinstance(target, CallbackQuery):
         await target.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")

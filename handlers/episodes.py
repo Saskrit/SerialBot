@@ -12,6 +12,7 @@ from services.serial_episodes import (
     show_serial_episodes_for_month,
     show_serial_month_picker,
 )
+from services.settings import format_free_limit_label, get_free_daily_limit, is_free_unlimited
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +61,17 @@ async def episode_month_page(callback: CallbackQuery, db_user: dict):
 
 
 async def _send_daily_limit_message(bot, user_id: int, episode_id: str) -> None:
+    limit = await get_free_daily_limit()
+    limit_line = (
+        "Free users currently have unlimited daily episodes."
+        if is_free_unlimited(limit)
+        else f"Free users can watch {format_free_limit_label(limit)}."
+    )
     await bot.send_message(
         chat_id=user_id,
         text=(
             "⏳ <b>Daily limit reached</b>\n\n"
-            "Free users can watch 3 episodes per day.\n"
+            f"{limit_line}\n"
             "Unlock this episode for ₹10 or get VIP for unlimited access."
         ),
         reply_markup=limit_reached_keyboard(episode_id),

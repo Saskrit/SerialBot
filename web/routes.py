@@ -50,6 +50,12 @@ def _create_bot(request: web.Request):
     return request.app["create_bot"]()
 
 
+async def admin_entry(request: web.Request) -> web.Response:
+    if get_admin_id(request) is not None:
+        raise web.HTTPFound("/admin/")
+    raise web.HTTPFound("/admin/login")
+
+
 async def login_page(request: web.Request) -> web.Response:
     if get_admin_id(request) is not None:
         raise web.HTTPFound("/admin/")
@@ -438,6 +444,7 @@ def setup_admin_routes(app: web.Application, create_bot) -> None:
         return
 
     app["create_bot"] = create_bot
+    app.router.add_get("/admin", admin_entry)
     app.router.add_get("/admin/login", login_page)
     app.router.add_post("/admin/login", login_submit)
     app.router.add_post("/admin/logout", logout)

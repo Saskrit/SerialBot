@@ -11,7 +11,7 @@ router = Router()
 @router.message(F.text == "📋 My Plan")
 async def my_plan_message(message: Message, db_user: dict):
     await message.answer(
-        build_plan_text(db_user),
+        await build_plan_text(db_user),
         reply_markup=plan_keyboard(db_user),
         parse_mode="HTML",
     )
@@ -20,7 +20,7 @@ async def my_plan_message(message: Message, db_user: dict):
 @router.callback_query(F.data == "plan")
 async def my_plan_callback(callback: CallbackQuery, db_user: dict):
     await callback.message.answer(
-        build_plan_text(db_user),
+        await build_plan_text(db_user),
         reply_markup=plan_keyboard(db_user),
         parse_mode="HTML",
     )

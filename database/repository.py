@@ -3,7 +3,7 @@ from typing import Any
 
 from bson import ObjectId
 
-from config import FREE_DAILY_LIMIT, TZ
+from services.settings import get_free_daily_limit, is_free_unlimited
 from database.connection import get_db
 from database.datetime_utils import ensure_aware, normalize_user_datetimes
 
@@ -169,18 +169,22 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
     if episode_id in user.get("unlocked_episodes", []):
         return True, ""
 
-    if user.get("daily_watches", 0) >= FREE_DAILY_LIMIT:
+    limit = await get_free_daily_limit()
+    if not is_free_unlimited(limit) and user.get("daily_watches", 0) >= limit:
         return False, "daily_limit"
 
     return True, ""
 
 
-def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> bool:
+async def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> bool:
     if user.get("plan") == "vip":
         return False
     if episode_id in user.get("unlocked_episodes", []):
         return False
-    return user.get("daily_watches", 0) >= FREE_DAILY_LIMIT
+    limit = await get_free_daily_limit()
+    if is_free_unlimited(limit):
+        return False
+    return user.get("daily_watches", 0) >= limit
 
 
 async def get_user_stats() -> dict[str, int]:

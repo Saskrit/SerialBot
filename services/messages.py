@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from config import EPISODES_PER_PAGE, FREE_DAILY_LIMIT, TZ, SERIALS_PER_PAGE
+from config import EPISODES_PER_PAGE, TZ, SERIALS_PER_PAGE
 from database import repository as repo
 from database.datetime_utils import ensure_aware
 from services.date_query import UserDateQuery, format_user_date_label
+from services.settings import format_free_limit_label, get_free_daily_limit, is_free_unlimited
 
 DATE_EPISODES_PER_PAGE = 8
 
@@ -22,12 +23,19 @@ def plan_label(user: dict) -> str:
     return "Free Tier"
 
 
-def _usage_summary(user: dict) -> str:
+def _usage_summary(user: dict, *, daily_limit: int) -> str:
     watched = user.get("daily_watches", 0)
     if user.get("plan") == "vip":
         return "Unlimited (VIP)"
-    remaining = max(0, FREE_DAILY_LIMIT - watched)
-    return f"{watched}/{FREE_DAILY_LIMIT} used · {remaining} left today"
+    if is_free_unlimited(daily_limit):
+        return f"{watched} watched today · unlimited free access"
+    remaining = max(0, daily_limit - watched)
+    return f"{watched}/{daily_limit} used · {remaining} left today"
+
+
+async def usage_summary(user: dict) -> str:
+    limit = await get_free_daily_limit()
+    return _usage_summary(user, daily_limit=limit)
 
 
 def _vip_time_remaining(user: dict) -> str | None:
@@ -50,7 +58,8 @@ def _vip_time_remaining(user: dict) -> str | None:
     return f"{minutes} minute(s) remaining"
 
 
-def build_status_text(user: dict, *, is_admin: bool = False) -> str:
+async def build_status_text(user: dict, *, is_admin: bool = False) -> str:
+    daily_limit = await get_free_daily_limit()
     name = user.get("first_name") or "there"
     username = user.get("username")
     username_line = f"@{username}" if username else "Not set"
@@ -65,7 +74,7 @@ def build_status_text(user: dict, *, is_admin: bool = False) -> str:
         f"Account: {'🚫 Banned' if user.get('banned') else '✅ Active'}",
         "",
         "📊 <b>Usage Today</b>",
-        f"Episodes: <b>{_usage_summary(user)}</b>",
+        f"Episodes: <b>{_usage_summary(user, daily_limit=daily_limit)}</b>",
     ]
 
     registered = user.get("registered_at")
@@ -100,7 +109,8 @@ def build_status_text(user: dict, *, is_admin: bool = False) -> str:
 
     return "\n".join(lines)
 
-def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
+async def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
+    daily_limit = await get_free_daily_limit()
     name = user.get("first_name") or "there"
     username = user.get("username")
     username_line = f"@{username}" if username else "Not set"
@@ -115,7 +125,7 @@ def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
         f"Status: {'🚫 Banned' if user.get('banned') else '✅ Active'}",
         "",
         "📊 <b>Usage Today</b>",
-        f"Episodes: <b>{_usage_summary(user)}</b>",
+        f"Episodes: <b>{_usage_summary(user, daily_limit=daily_limit)}</b>",
     ]
 
     registered = user.get("registered_at")
@@ -154,7 +164,8 @@ def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
     return "\n".join(lines)
 
 
-def build_plan_text(user: dict) -> str:
+async def build_plan_text(user: dict) -> str:
+    daily_limit = await get_free_daily_limit()
     if user.get("plan") == "vip":
         lines = [
             "📋 <b>My Plan</b>",
@@ -179,7 +190,7 @@ def build_plan_text(user: dict) -> str:
         "",
         f"Plan: <b>{plan_label(user)}</b>",
         f"Status: {'🚫 Banned' if user.get('banned') else '✅ Active'}",
-        f"Daily usage: <b>{_usage_summary(user)}</b>",
+        f"Daily usage: <b>{_usage_summary(user, daily_limit=daily_limit)}</b>",
     ]
     registered = user.get("registered_at")
     if registered:
@@ -189,10 +200,15 @@ def build_plan_text(user: dict) -> str:
     if unlocks:
         lines.append(f"Active unlocks: <b>{len(unlocks)}</b> episode(s)")
 
+    free_line = (
+        "Free users have unlimited daily episodes."
+        if is_free_unlimited(daily_limit)
+        else f"Free users get {format_free_limit_label(daily_limit)}."
+    )
     lines.extend(
         [
             "",
-            "Free users get 3 episodes/day.",
+            free_line,
             "VIP: unlimited access · ₹99/month",
             "Single unlock: ₹10/episode",
         ]
@@ -231,10 +247,12 @@ async def build_episode_list_text(
         "",
         "Select an episode to watch:",
     ]
+    limit = await get_free_daily_limit()
     if (
         user
         and user.get("plan") != "vip"
-        and user.get("daily_watches", 0) >= FREE_DAILY_LIMIT
+        and not is_free_unlimited(limit)
+        and user.get("daily_watches", 0) >= limit
     ):
         lines.extend(
             [
@@ -257,7 +275,7 @@ def build_episode_months_text(serial: dict, months: list[dict[str, int]]) -> str
     return "\n".join(lines)
 
 
-def build_date_episodes_text(
+async def build_date_episodes_text(
     episodes: list[dict],
     query: UserDateQuery,
     page: int,
@@ -288,10 +306,12 @@ def build_date_episodes_text(
         year_hint = f" · {ep['date'].year}" if not query.year else ""
         lines.append(f"• <b>{ep.get('serial_name', 'Serial')}</b>{year_hint}")
 
+    limit = await get_free_daily_limit()
     if (
         user
         and user.get("plan") != "vip"
-        and user.get("daily_watches", 0) >= FREE_DAILY_LIMIT
+        and not is_free_unlimited(limit)
+        and user.get("daily_watches", 0) >= limit
     ):
         lines.extend(
             [

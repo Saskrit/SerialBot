@@ -14,6 +14,7 @@ from database.connection import get_db
 from keyboards.inline import (
     admin_delete_episode_confirm_keyboard,
     admin_episodes_keyboard,
+    admin_free_limit_keyboard,
     admin_menu_keyboard,
     admin_user_keyboard,
     admin_users_keyboard,
@@ -22,6 +23,7 @@ from services.messages import format_date
 from services.episode_upload import save_episode_from_addepisode, save_episode_from_message
 from services.upload_parser import parse_episode_date
 from services import admin_actions
+from services.settings import format_free_limit_label, get_free_daily_limit, set_free_daily_limit
 from states import AdminStates
 
 logger = logging.getLogger(__name__)
@@ -310,13 +312,18 @@ async def admin_panel(message: Message):
 USERS_PER_PAGE = 15
 
 
-def _format_user_line(index: int, user: dict) -> str:
+def _format_user_line(index: int, user: dict, *, daily_limit: int) -> str:
     name = user.get("first_name") or user.get("username") or "Unknown"
     username = user.get("username")
     user_label = f"{name} (@{username})" if username else name
     plan = "VIP" if user.get("plan") == "vip" else "Free"
     status = "🚫" if user.get("banned") else "✅"
-    usage = "∞" if user.get("plan") == "vip" else f"{user.get('daily_watches', 0)}/3 today"
+    if user.get("plan") == "vip":
+        usage = "∞"
+    elif daily_limit <= 0:
+        usage = f"{user.get('daily_watches', 0)} today · ∞"
+    else:
+        usage = f"{user.get('daily_watches', 0)}/{daily_limit} today"
     return (
         f"{index}. {status} <b>{user_label}</b>\n"
         f"   ID: <code>{user['telegram_id']}</code> · {plan} · {usage}"
@@ -324,6 +331,7 @@ def _format_user_line(index: int, user: dict) -> str:
 
 
 async def _send_users_page(target: Message | CallbackQuery, page: int) -> None:
+    daily_limit = await get_free_daily_limit()
     users, total = await repo.list_users(page, USERS_PER_PAGE)
     if total == 0:
         text = "👥 <b>All Users</b>\n\nNo users registered yet."
@@ -338,7 +346,7 @@ async def _send_users_page(target: Message | CallbackQuery, page: int) -> None:
             f"Total: <b>{total}</b>\n",
         ]
         for i, user in enumerate(users, start=start):
-            lines.append(_format_user_line(i, user))
+            lines.append(_format_user_line(i, user, daily_limit=daily_limit))
         text = "\n".join(lines)
         keyboard = admin_users_keyboard(page, total_pages)
 
@@ -389,6 +397,7 @@ async def admin_stats(callback: CallbackQuery):
     pending = await get_db().payments.count_documents(
         {"status": "pending", "screenshot_file_id": {"$ne": None}}
     )
+    free_limit = await get_free_daily_limit()
 
     text = (
         "📊 <b>Statistics</b>\n\n"
@@ -397,10 +406,90 @@ async def admin_stats(callback: CallbackQuery):
         f"Active today: <b>{stats['active_today']}</b>\n"
         f"Banned: <b>{stats['banned']}</b>\n"
         f"Episodes: <b>{episode_count}</b>\n"
-        f"Pending payments: <b>{pending}</b>"
+        f"Pending payments: <b>{pending}</b>\n"
+        f"Free tier limit: <b>{format_free_limit_label(free_limit)}</b>"
     )
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
+
+
+def _free_limit_menu_text(limit: int) -> str:
+    return (
+        "⚙️ <b>Free Tier Daily Limit</b>\n\n"
+        f"Current: <b>{format_free_limit_label(limit)}</b>\n\n"
+        "Tap a value below, or use:\n"
+        "<code>/setfreelimit 0</code> — free for all\n"
+        "<code>/setfreelimit 5</code> — 5 episodes/day"
+    )
+
+
+@router.callback_query(F.data == "admin:freelimit")
+async def admin_free_limit_menu(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    limit = await get_free_daily_limit()
+    await callback.message.answer(
+        _free_limit_menu_text(limit),
+        reply_markup=admin_free_limit_keyboard(limit),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:freelimit:"))
+async def admin_free_limit_set(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    value = int(callback.data.rsplit(":", 1)[1])
+    await set_free_daily_limit(value)
+    limit = await get_free_daily_limit()
+    await callback.message.edit_text(
+        _free_limit_menu_text(limit) + "\n\n✅ Saved.",
+        reply_markup=admin_free_limit_keyboard(limit),
+        parse_mode="HTML",
+    )
+    await callback.answer("Updated ✅")
+
+
+@router.message(Command("freelimit"))
+async def free_limit_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    limit = await get_free_daily_limit()
+    await message.answer(
+        _free_limit_menu_text(limit),
+        reply_markup=admin_free_limit_keyboard(limit),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("setfreelimit"))
+async def set_free_limit_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip().isdigit():
+        await message.answer(
+            "Usage:\n"
+            "<code>/setfreelimit 0</code> — free for all\n"
+            "<code>/setfreelimit 3</code> — 3 episodes/day\n"
+            "<code>/setfreelimit 6</code> — 6 episodes/day",
+            parse_mode="HTML",
+        )
+        return
+
+    value = int(parts[1].strip())
+    await set_free_daily_limit(value)
+    limit = await get_free_daily_limit()
+    await message.answer(
+        f"✅ Free tier limit set to <b>{format_free_limit_label(limit)}</b>.",
+        parse_mode="HTML",
+    )
 
 
 @router.callback_query(F.data == "admin:payments")

@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
-from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, FREE_DAILY_LIMIT, SERIALS_PER_PAGE, VIP_MONTHLY_PRICE
+from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, SERIALS_PER_PAGE, VIP_MONTHLY_PRICE
 from database import repository as repo
 from services.messages import DATE_EPISODES_PER_PAGE, format_date, format_month_year
 
@@ -97,7 +97,7 @@ async def episode_list_keyboard(
     for ep in episodes:
         label = format_date(ep["date"])
         ep_id = str(ep["_id"])
-        if user and repo.is_episode_locked_for_user(user, ep_id):
+        if user and await repo.is_episode_locked_for_user(user, ep_id):
             rows.append(
                 [
                     InlineKeyboardButton(
@@ -195,7 +195,7 @@ def serial_nav_keyboard(*, show_catalog_back: bool = False) -> InlineKeyboardMar
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def date_episodes_keyboard(
+async def date_episodes_keyboard(
     episodes: list[dict],
     date_key: str,
     page: int,
@@ -211,7 +211,7 @@ def date_episodes_keyboard(
     for ep in page_episodes:
         ep_id = str(ep["_id"])
         name = ep.get("serial_name", "Serial")
-        if user and repo.is_episode_locked_for_user(user, ep_id):
+        if user and await repo.is_episode_locked_for_user(user, ep_id):
             rows.append(
                 [
                     InlineKeyboardButton(
@@ -344,11 +344,38 @@ def new_episode_notification_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def admin_free_limit_keyboard(current: int) -> InlineKeyboardMarkup:
+    options = [0, 3, 4, 5, 6, 7, 8, 9, 10]
+    rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
+    for value in options:
+        if value == 0:
+            label = "♾ Free for all"
+        else:
+            label = str(value)
+        if value == current:
+            label = f"✓ {label}"
+        row.append(
+            InlineKeyboardButton(
+                text=label,
+                callback_data=f"admin:freelimit:{value}",
+            )
+        )
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
         [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
         [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
+        [InlineKeyboardButton(text="⚙️ Free Tier Limit", callback_data="admin:freelimit")],
         [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
         [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
         [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],

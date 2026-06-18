@@ -31,7 +31,7 @@ async def home_panel(callback: CallbackQuery, db_user: dict):
     await _remove_inline_keyboard(callback)
     is_admin = callback.from_user.id in ADMIN_IDS
     await callback.message.answer(
-        build_user_info_text(db_user, is_admin=is_admin),
+        await build_user_info_text(db_user, is_admin=is_admin),
         reply_markup=main_menu_keyboard(db_user),
         parse_mode="HTML",
     )
