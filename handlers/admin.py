@@ -14,18 +14,28 @@ from database.connection import get_db
 from keyboards.inline import (
     admin_delete_episode_confirm_keyboard,
     admin_delete_serial_confirm_keyboard,
+    admin_episode_stats_keyboard,
     admin_episodes_keyboard,
     admin_free_limit_keyboard,
     admin_menu_keyboard,
     admin_serials_delete_keyboard,
+    admin_trial_ttl_keyboard,
     admin_user_keyboard,
     admin_users_keyboard,
 )
-from services.messages import format_date
+from services.messages import format_date, format_datetime
 from services.episode_upload import save_episode_from_addepisode, save_episode_from_message
 from services.serial_utils import parse_add_serial_input
 from services import admin_actions
-from services.settings import format_free_limit_label, get_free_daily_limit, set_free_daily_limit
+from services.settings import (
+    format_free_limit_label,
+    format_trial_ttl_label,
+    get_free_daily_limit,
+    get_trial_episode_ttl_seconds,
+    parse_trial_ttl_setting,
+    set_free_daily_limit,
+    set_trial_episode_ttl_seconds,
+)
 from states import AdminStates
 
 logger = logging.getLogger(__name__)
@@ -352,6 +362,8 @@ async def list_episodes_cmd(message: Message):
         await message.answer(
             "Usage:\n"
             "<code>/episodes laughter-chef-3</code>\n\n"
+            "Views:\n"
+            "<code>/epstats laughter-chef-3</code>\n\n"
             "Delete:\n"
             "<code>/delepisode EPISODE_ID</code>\n"
             "<code>/delepisode laughter-chef-3 17-06-2026</code>",
@@ -390,7 +402,10 @@ async def _send_admin_episode_list(
             "Tap an episode to delete it:",
         ]
         for ep in episodes:
-            lines.append(f"• {format_date(ep['date'])} — <code>{ep['_id']}</code>")
+            views = ep.get("view_count", 0)
+            lines.append(
+                f"• {format_date(ep['date'])} — 👁 <b>{views}</b> — <code>{ep['_id']}</code>"
+            )
         text = "\n".join(lines)
         keyboard = await admin_episodes_keyboard(serial_slug, page)
 
@@ -399,6 +414,173 @@ async def _send_admin_episode_list(
         await target.answer()
     else:
         await target.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+async def _send_admin_episode_stats_list(
+    target: Message | CallbackQuery, serial_slug: str, page: int
+) -> None:
+    serial = await repo.get_serial_by_slug(serial_slug)
+    if not serial:
+        text = f"Serial '{serial_slug}' not found."
+        if isinstance(target, CallbackQuery):
+            await target.answer(text, show_alert=True)
+        else:
+            await target.answer(text)
+        return
+
+    episodes, total = await repo.get_episodes(serial_slug, page, 8)
+    if total == 0:
+        text = f"📺 <b>{serial['name']}</b>\n\nNo episodes in database."
+        keyboard = admin_menu_keyboard()
+    else:
+        total_pages = max(1, (total + 8 - 1) // 8)
+        page = max(0, min(page, total_pages - 1))
+        episodes, total = await repo.get_episodes(serial_slug, page, 8)
+        page_views = sum(ep.get("view_count", 0) for ep in episodes)
+        lines = [
+            f"📈 <b>Episode Views</b> — {serial['name']}",
+            f"Page {page + 1}/{total_pages} · {total} episode(s)",
+            f"Views on this page: <b>{page_views}</b>",
+            "",
+            "Tap an episode for watcher details:",
+        ]
+        for ep in episodes:
+            views = ep.get("view_count", 0)
+            lines.append(f"• {format_date(ep['date'])} — 👁 <b>{views}</b> views")
+        text = "\n".join(lines)
+        keyboard = await admin_episode_stats_keyboard(serial_slug, page)
+
+    if isinstance(target, CallbackQuery):
+        await target.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        await target.answer()
+    else:
+        await target.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.message(Command("epstats"))
+async def episode_stats_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer(
+            "Usage: <code>/epstats laughter-chef-3</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    slug = args[1].strip().lower().replace(" ", "-")
+    await _send_admin_episode_stats_list(message, slug, 0)
+
+
+@router.callback_query(F.data == "admin:epstats")
+async def admin_episode_stats_start(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    await state.set_state(AdminStates.epstats_serial)
+    await callback.message.answer(
+        "📈 <b>Episode Views</b>\n\n"
+        "Send the serial slug or name:\n"
+        "Example: <code>laughter-chef-3</code> or <code>Laughter Chef 3</code>\n\n"
+        "Or use: <code>/epstats laughter-chef-3</code>",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.message(AdminStates.epstats_serial)
+async def admin_episode_stats_serial(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    from services.serial_matcher import match_serial
+
+    query = message.text.strip()
+    slug = query.lower().replace(" ", "-")
+    serial = await repo.get_serial_by_slug(slug)
+    if not serial:
+        serial = await match_serial(query)
+    if not serial:
+        await message.answer("Serial not found. Try again or send /admin to cancel.")
+        return
+
+    await state.clear()
+    await _send_admin_episode_stats_list(message, serial["slug"], 0)
+
+
+@router.callback_query(F.data.startswith("admin:epstatslist:"))
+async def admin_episode_stats_page(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    _, _, slug, page_str = callback.data.split(":", 3)
+    await _send_admin_episode_stats_list(callback, slug, int(page_str))
+
+
+@router.callback_query(F.data.startswith("admin:epstat:"))
+async def admin_episode_stats_detail(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    parts = callback.data.split(":")
+    episode_id = parts[2]
+    page = int(parts[3]) if len(parts) > 3 else 0
+
+    episode = await repo.get_episode(episode_id)
+    if not episode:
+        await callback.answer("Episode not found.", show_alert=True)
+        return
+
+    watchers = await repo.get_episode_watchers(episode_id)
+    views = episode.get("view_count", 0)
+    lines = [
+        "📈 <b>Episode Stats</b>",
+        "",
+        f"Serial: <b>{episode.get('serial_name', '')}</b>",
+        f"Date: {format_date(episode['date'])}",
+        f"Total views: <b>{views}</b>",
+        f"Unique watchers: <b>{len(watchers)}</b>",
+        f"ID: <code>{episode_id}</code>",
+    ]
+
+    if watchers:
+        lines.extend(["", "<b>Recent watchers</b>"])
+        for index, watcher in enumerate(watchers[:15], start=1):
+            name = watcher.get("first_name") or "Unknown"
+            username = watcher.get("username")
+            user_label = f"{name} (@{username})" if username else name
+            count = watcher.get("watch_count", 1)
+            watched_at = watcher.get("watched_at")
+            when = format_datetime(watched_at) if watched_at else "—"
+            repeat = f" · {count}x" if count > 1 else ""
+            lines.append(
+                f"{index}. {user_label} — <code>{watcher['telegram_id']}</code>{repeat}\n"
+                f"   Last: {when}"
+            )
+        if len(watchers) > 15:
+            lines.append(f"\n… and {len(watchers) - 15} more")
+    else:
+        lines.extend(["", "No watchers recorded yet."])
+
+    slug = episode["serial_slug"]
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="◀ Back to list",
+                    callback_data=f"admin:epstatslist:{slug}:{page}",
+                )
+            ],
+            [InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")],
+        ]
+    )
+    await callback.message.edit_text("\n".join(lines), reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
 
 
 @router.message(Command("delepisode"))
@@ -641,10 +823,12 @@ async def admin_stats(callback: CallbackQuery):
 
     stats = await repo.get_user_stats()
     episode_count = await get_db().episodes.count_documents({})
+    total_views = await repo.get_total_episode_views()
     pending = await get_db().payments.count_documents(
         {"status": "pending", "screenshot_file_id": {"$ne": None}}
     )
     free_limit = await get_free_daily_limit()
+    trial_ttl = await get_trial_episode_ttl_seconds()
 
     text = (
         "📊 <b>Statistics</b>\n\n"
@@ -653,8 +837,10 @@ async def admin_stats(callback: CallbackQuery):
         f"Active today: <b>{stats['active_today']}</b>\n"
         f"Banned: <b>{stats['banned']}</b>\n"
         f"Episodes: <b>{episode_count}</b>\n"
+        f"Total episode views: <b>{total_views}</b>\n"
         f"Pending payments: <b>{pending}</b>\n"
-        f"Free tier limit: <b>{format_free_limit_label(free_limit)}</b>"
+        f"Free tier limit: <b>{format_free_limit_label(free_limit)}</b>\n"
+        f"Trial episode timer: <b>{format_trial_ttl_label(trial_ttl)}</b>"
     )
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
@@ -735,6 +921,95 @@ async def set_free_limit_cmd(message: Message):
     limit = await get_free_daily_limit()
     await message.answer(
         f"✅ Free tier limit set to <b>{format_free_limit_label(limit)}</b>.",
+        parse_mode="HTML",
+    )
+
+
+def _trial_ttl_menu_text(seconds: int) -> str:
+    return (
+        "⏳ <b>Trial Episode Timer</b>\n\n"
+        f"Current: <b>{format_trial_ttl_label(seconds)}</b>\n\n"
+        "Free users get a trial watch. After the timer, the video is "
+        "removed from their chat and they cannot watch that episode again "
+        "unless they unlock it or get VIP.\n\n"
+        "Tap a preset below, or use:\n"
+        "<code>/settrial off</code>\n"
+        "<code>/settrial 10s</code>\n"
+        "<code>/settrial 1min</code>\n"
+        "<code>/settrial 2hr</code>"
+    )
+
+
+@router.callback_query(F.data == "admin:trial")
+async def admin_trial_ttl_menu(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    seconds = await get_trial_episode_ttl_seconds()
+    await callback.message.answer(
+        _trial_ttl_menu_text(seconds),
+        reply_markup=admin_trial_ttl_keyboard(seconds),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:trial:"))
+async def admin_trial_ttl_set(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    seconds = int(callback.data.rsplit(":", 1)[1])
+    await set_trial_episode_ttl_seconds(seconds)
+    seconds = await get_trial_episode_ttl_seconds()
+    await callback.message.edit_text(
+        _trial_ttl_menu_text(seconds) + "\n\n✅ Saved.",
+        reply_markup=admin_trial_ttl_keyboard(seconds),
+        parse_mode="HTML",
+    )
+    await callback.answer("Updated ✅")
+
+
+@router.message(Command("trial"))
+async def trial_ttl_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    seconds = await get_trial_episode_ttl_seconds()
+    await message.answer(
+        _trial_ttl_menu_text(seconds),
+        reply_markup=admin_trial_ttl_keyboard(seconds),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("settrial"))
+async def set_trial_ttl_cmd(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer(
+            "Usage:\n"
+            "<code>/settrial off</code>\n"
+            "<code>/settrial 10s</code>\n"
+            "<code>/settrial 1min</code>\n"
+            "<code>/settrial 2hr</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    seconds = parse_trial_ttl_setting(parts[1].strip())
+    if seconds is None:
+        await message.answer("Could not parse duration. Examples: 10s, 1min, 2hr, off")
+        return
+
+    await set_trial_episode_ttl_seconds(seconds)
+    seconds = await get_trial_episode_ttl_seconds()
+    await message.answer(
+        f"✅ Trial timer set to <b>{format_trial_ttl_label(seconds)}</b>.",
         parse_mode="HTML",
     )
 

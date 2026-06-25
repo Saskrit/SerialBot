@@ -9,8 +9,10 @@ from services.messages import format_date
 logger = logging.getLogger(__name__)
 
 
-async def deliver_episode_to_user(bot: Bot, user_id: int, episode: dict) -> tuple[bool, str]:
-    """Send episode video directly to the user's private chat."""
+async def deliver_episode_to_user(
+    bot: Bot, user_id: int, episode: dict
+) -> tuple[bool, str, int | None]:
+    """Send episode video to the user's private chat. Returns (ok, error, message_id)."""
     caption = (
         f"📺 <b>{episode.get('serial_name', '')}</b>\n"
         f"📅 {format_date(episode['date'])}"
@@ -19,7 +21,7 @@ async def deliver_episode_to_user(bot: Bot, user_id: int, episode: dict) -> tupl
     message_id = episode.get("message_id")
     if STORAGE_CHANNEL_ID and message_id:
         try:
-            await bot.copy_message(
+            sent = await bot.copy_message(
                 chat_id=user_id,
                 from_chat_id=STORAGE_CHANNEL_ID,
                 message_id=message_id,
@@ -27,9 +29,9 @@ async def deliver_episode_to_user(bot: Bot, user_id: int, episode: dict) -> tupl
                 protect_content=True,
                 parse_mode="HTML",
             )
-            return True, ""
+            return True, "", sent.message_id
         except TelegramForbiddenError:
-            return False, "Please open the bot and send /start first, then try again."
+            return False, "Please open the bot and send /start first, then try again.", None
         except TelegramBadRequest as exc:
             logger.warning(
                 "copy_message failed for episode %s, trying file_id: %s",
@@ -39,36 +41,36 @@ async def deliver_episode_to_user(bot: Bot, user_id: int, episode: dict) -> tupl
 
     file_id = episode.get("file_id")
     if not file_id:
-        return False, "Episode video is not available. Contact support."
+        return False, "Episode video is not available. Contact support.", None
 
     try:
-        await bot.send_video(
+        sent = await bot.send_video(
             chat_id=user_id,
             video=file_id,
             caption=caption,
             protect_content=True,
             parse_mode="HTML",
         )
-        return True, ""
+        return True, "", sent.message_id
     except TelegramBadRequest:
         try:
-            await bot.send_document(
+            sent = await bot.send_document(
                 chat_id=user_id,
                 document=file_id,
                 caption=caption,
                 protect_content=True,
                 parse_mode="HTML",
             )
-            return True, ""
+            return True, "", sent.message_id
         except TelegramForbiddenError:
-            return False, "Please open the bot and send /start first, then try again."
+            return False, "Please open the bot and send /start first, then try again.", None
         except TelegramBadRequest as exc:
             logger.exception("Failed to deliver episode %s", episode.get("_id"))
-            return False, f"Failed to deliver video: {exc.message}"
+            return False, f"Failed to deliver video: {exc.message}", None
     except TelegramForbiddenError:
-        return False, "Please open the bot and send /start first, then try again."
+        return False, "Please open the bot and send /start first, then try again.", None
     except Exception:
         logger.exception("Failed to deliver episode %s", episode.get("_id"))
-        return False, "Failed to deliver video. Contact support."
+        return False, "Failed to deliver video. Contact support.", None
 
-    return False, "Failed to deliver video. Contact support."
+    return False, "Failed to deliver video. Contact support.", None

@@ -97,24 +97,23 @@ async def episode_list_keyboard(
     for ep in episodes:
         label = format_date(ep["date"])
         ep_id = str(ep["_id"])
-        if user and await repo.is_episode_locked_for_user(user, ep_id):
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"🔒 {label}",
-                        callback_data=f"locked:{ep_id}",
-                    )
-                ]
-            )
+        if user and await repo.has_used_trial_episode(user, ep_id):
+            button_label = f"🔒 {label}"
+            callback_data = f"trialused:{ep_id}"
+        elif user and await repo.is_episode_daily_locked(user, ep_id):
+            button_label = f"🔒 {label}"
+            callback_data = f"locked:{ep_id}"
         else:
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"▶ {label}",
-                        callback_data=f"watch:{ep_id}",
-                    )
-                ]
-            )
+            button_label = f"▶ {label}"
+            callback_data = f"watch:{ep_id}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=button_label,
+                    callback_data=callback_data,
+                )
+            ]
+        )
 
     nav: list[InlineKeyboardButton] = []
     total_pages = max(1, (total + EPISODES_PER_PAGE - 1) // EPISODES_PER_PAGE)
@@ -211,24 +210,23 @@ async def date_episodes_keyboard(
     for ep in page_episodes:
         ep_id = str(ep["_id"])
         name = ep.get("serial_name", "Serial")
-        if user and await repo.is_episode_locked_for_user(user, ep_id):
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"🔒 {name}",
-                        callback_data=f"locked:{ep_id}",
-                    )
-                ]
-            )
+        if user and await repo.has_used_trial_episode(user, ep_id):
+            button_label = f"🔒 {name}"
+            callback_data = f"trialused:{ep_id}"
+        elif user and await repo.is_episode_daily_locked(user, ep_id):
+            button_label = f"🔒 {name}"
+            callback_data = f"locked:{ep_id}"
         else:
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"▶ {name}",
-                        callback_data=f"watch:{ep_id}",
-                    )
-                ]
-            )
+            button_label = f"▶ {name}"
+            callback_data = f"watch:{ep_id}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=button_label,
+                    callback_data=callback_data,
+                )
+            ]
+        )
 
     nav: list[InlineKeyboardButton] = []
     if page > 0:
@@ -370,18 +368,53 @@ def admin_free_limit_keyboard(current: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def admin_trial_ttl_keyboard(current: int) -> InlineKeyboardMarkup:
+    from services.settings import format_trial_ttl_label
+
+    presets = [
+        (0, "Off"),
+        (10, "10 sec"),
+        (30, "30 sec"),
+        (60, "1 min"),
+        (120, "2 min"),
+        (300, "5 min"),
+        (3600, "1 hr"),
+        (7200, "2 hr"),
+        (86400, "24 hr"),
+    ]
+    rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
+    for seconds, short_label in presets:
+        label = f"✓ {short_label}" if seconds == current else short_label
+        row.append(
+            InlineKeyboardButton(
+                text=label,
+                callback_data=f"admin:trial:{seconds}",
+            )
+        )
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
         [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
         [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
         [InlineKeyboardButton(text="⚙️ Free Tier Limit", callback_data="admin:freelimit")],
+        [InlineKeyboardButton(text="⏳ Trial Episode Timer", callback_data="admin:trial")],
         [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
         [InlineKeyboardButton(text="💬 Support Tickets", callback_data="admin:support")],
         [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],
         [InlineKeyboardButton(text="⭐ Grant VIP", callback_data="admin:grantvip")],
         [InlineKeyboardButton(text="➕ Add Serial", callback_data="admin:addserial")],
         [InlineKeyboardButton(text="🗑 Delete Serial", callback_data="admin:delserial:0")],
+        [InlineKeyboardButton(text="📈 Episode Views", callback_data="admin:epstats")],
         [InlineKeyboardButton(text="🗑 Manage Episodes", callback_data="admin:deleps")],
         [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
     ]
@@ -522,6 +555,48 @@ async def admin_episodes_keyboard(
             InlineKeyboardButton(
                 text="Next ▶",
                 callback_data=f"admin:epslist:{serial_slug}:{page + 1}",
+            )
+        )
+    if nav:
+        rows.append(nav)
+
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    append_ui_actions(rows, include_home=False)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def admin_episode_stats_keyboard(
+    serial_slug: str, page: int
+) -> InlineKeyboardMarkup:
+    episodes, total = await repo.get_episodes(serial_slug, page, ADMIN_EPISODES_PER_PAGE)
+    rows: list[list[InlineKeyboardButton]] = []
+
+    for ep in episodes:
+        label = format_date(ep["date"])
+        views = ep.get("view_count", 0)
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"👁 {views} · {label}",
+                    callback_data=f"admin:epstat:{str(ep['_id'])}:{page}",
+                )
+            ]
+        )
+
+    total_pages = max(1, (total + ADMIN_EPISODES_PER_PAGE - 1) // ADMIN_EPISODES_PER_PAGE)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(
+                text="◀ Prev",
+                callback_data=f"admin:epstatslist:{serial_slug}:{page - 1}",
+            )
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="Next ▶",
+                callback_data=f"admin:epstatslist:{serial_slug}:{page + 1}",
             )
         )
     if nav:

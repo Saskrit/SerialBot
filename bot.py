@@ -78,6 +78,9 @@ async def polling_loop(dp: Dispatcher, shutdown: asyncio.Event) -> None:
             )
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("Webhook cleared. Starting polling (only ONE instance allowed).")
+            from services.trial_episodes import resume_pending_trial_deletions
+
+            await resume_pending_trial_deletions(bot)
             await dp.start_polling(
                 bot,
                 close_bot_session=False,

@@ -35,6 +35,7 @@ async def init_db() -> AsyncIOMotorDatabase:
     await db.payments.create_index([("status", 1), ("created_at", -1)])
     await db.episode_requests.create_index([("status", 1), ("created_at", -1)])
     await db.support_tickets.create_index([("status", 1), ("created_at", -1)])
+    await db.trial_deletions.create_index("delete_at")
 
     inserted = await seed_serials(db)
     if inserted:

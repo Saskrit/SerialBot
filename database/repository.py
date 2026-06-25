@@ -48,6 +48,7 @@ async def get_or_create_user(
         "daily_watches": 0,
         "daily_reset_date": _today().isoformat(),
         "unlocked_episodes": [],
+        "trial_episodes": [],
         "banned": False,
         "registered_at": now,
         "last_active": now,
@@ -99,23 +100,89 @@ async def is_banned(telegram_id: int) -> bool:
 
 
 async def record_watch(telegram_id: int, episode_id: str) -> None:
-    await get_db().users.update_one(
-        {"telegram_id": telegram_id},
-        {
-            "$inc": {"daily_watches": 1},
-            "$push": {
-                "watch_history": {
-                    "$each": [
-                        {
-                            "episode_id": episode_id,
-                            "watched_at": datetime.now(TZ),
-                        }
-                    ],
-                    "$slice": -100,
-                }
-            },
+    await record_episode_view(telegram_id, episode_id, counts_toward_daily_limit=True)
+
+
+async def record_episode_view(
+    telegram_id: int,
+    episode_id: str,
+    *,
+    counts_toward_daily_limit: bool = False,
+) -> None:
+    db = get_db()
+    now = datetime.now(TZ)
+    update: dict[str, Any] = {
+        "$push": {
+            "watch_history": {
+                "$each": [
+                    {
+                        "episode_id": episode_id,
+                        "watched_at": now,
+                    }
+                ],
+                "$slice": -100,
+            }
         },
+    }
+    if counts_toward_daily_limit:
+        update["$inc"] = {"daily_watches": 1}
+
+    await db.users.update_one({"telegram_id": telegram_id}, update)
+
+    if ObjectId.is_valid(episode_id):
+        await db.episodes.update_one(
+            {"_id": ObjectId(episode_id)},
+            {"$inc": {"view_count": 1}},
+        )
+
+
+async def get_total_episode_views() -> int:
+    db = get_db()
+    pipeline = [
+        {"$group": {"_id": None, "total": {"$sum": {"$ifNull": ["$view_count", 0]}}}}
+    ]
+    docs = await db.episodes.aggregate(pipeline).to_list(length=1)
+    return int(docs[0]["total"]) if docs else 0
+
+
+async def get_episode_watchers(
+    episode_id: str, limit: int = 25
+) -> list[dict[str, Any]]:
+    db = get_db()
+    cursor = db.users.find(
+        {"watch_history.episode_id": episode_id},
+        {"telegram_id": 1, "first_name": 1, "username": 1, "watch_history": 1},
     )
+    watchers: list[dict[str, Any]] = []
+    async for user in cursor:
+        matches = [
+            entry
+            for entry in user.get("watch_history", [])
+            if entry.get("episode_id") == episode_id
+        ]
+        if not matches:
+            continue
+        latest = max(
+            matches,
+            key=lambda entry: ensure_aware(entry.get("watched_at"))
+            or datetime.min.replace(tzinfo=TZ),
+        )
+        watchers.append(
+            {
+                "telegram_id": user["telegram_id"],
+                "first_name": user.get("first_name"),
+                "username": user.get("username"),
+                "watched_at": latest.get("watched_at"),
+                "watch_count": len(matches),
+            }
+        )
+
+    watchers.sort(
+        key=lambda entry: ensure_aware(entry.get("watched_at"))
+        or datetime.min.replace(tzinfo=TZ),
+        reverse=True,
+    )
+    return watchers[:limit]
 
 
 async def grant_vip(telegram_id: int, days: int = 30) -> datetime:
@@ -170,6 +237,9 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
     if episode_id in user.get("unlocked_episodes", []):
         return True, ""
 
+    if await has_used_trial_episode(user, episode_id):
+        return False, "trial_used"
+
     limit = await get_free_daily_limit()
     if not is_free_unlimited(limit) and user.get("daily_watches", 0) >= limit:
         return False, "daily_limit"
@@ -177,7 +247,67 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
     return True, ""
 
 
-async def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> bool:
+async def has_used_trial_episode(user: dict[str, Any], episode_id: str) -> bool:
+    from services.settings import get_trial_episode_ttl_seconds
+
+    if user.get("plan") == "vip":
+        return False
+    if episode_id in user.get("unlocked_episodes", []):
+        return False
+    if await get_trial_episode_ttl_seconds() <= 0:
+        return False
+    return episode_id in user.get("trial_episodes", [])
+
+
+async def mark_trial_episode_used(telegram_id: int, episode_id: str) -> None:
+    await get_db().users.update_one(
+        {"telegram_id": telegram_id},
+        {"$addToSet": {"trial_episodes": episode_id}},
+    )
+
+
+async def save_trial_deletion(
+    telegram_id: int,
+    episode_id: str,
+    message_id: int,
+    delete_at: datetime,
+) -> None:
+    await get_db().trial_deletions.update_one(
+        {
+            "telegram_id": telegram_id,
+            "episode_id": episode_id,
+            "message_id": message_id,
+        },
+        {
+            "$set": {
+                "telegram_id": telegram_id,
+                "episode_id": episode_id,
+                "message_id": message_id,
+                "delete_at": delete_at,
+            }
+        },
+        upsert=True,
+    )
+
+
+async def remove_trial_deletion(
+    telegram_id: int, episode_id: str, message_id: int
+) -> None:
+    await get_db().trial_deletions.delete_one(
+        {
+            "telegram_id": telegram_id,
+            "episode_id": episode_id,
+            "message_id": message_id,
+        }
+    )
+
+
+async def get_pending_trial_deletions() -> list[dict[str, Any]]:
+    cursor = get_db().trial_deletions.find({}).sort("delete_at", 1)
+    return await cursor.to_list(length=5000)
+
+
+async def is_episode_daily_locked(user: dict[str, Any], episode_id: str) -> bool:
     if user.get("plan") == "vip":
         return False
     if episode_id in user.get("unlocked_episodes", []):
@@ -186,6 +316,12 @@ async def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> b
     if is_free_unlimited(limit):
         return False
     return user.get("daily_watches", 0) >= limit
+
+
+async def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> bool:
+    if await has_used_trial_episode(user, episode_id):
+        return True
+    return await is_episode_daily_locked(user, episode_id)
 
 
 async def get_user_stats() -> dict[str, int]:
@@ -504,6 +640,7 @@ async def upsert_episode(
         "file_unique_id": file_unique_id,
         "message_id": message_id,
         "uploaded_at": now,
+        "view_count": 0,
     }
     existing = await db.episodes.find_one(
         {"serial_slug": serial_slug, "date": episode_date}

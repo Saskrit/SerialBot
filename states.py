@@ -21,4 +21,5 @@ class AdminStates(StatesGroup):
     delete_episode_serial = State()
     add_serial_name = State()
     delete_serial_lookup = State()
+    epstats_serial = State()
     reply_support = State()
