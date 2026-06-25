@@ -3,7 +3,7 @@ from datetime import datetime
 from config import EPISODES_PER_PAGE, TZ, SERIALS_PER_PAGE
 from database import repository as repo
 from database.datetime_utils import ensure_aware
-from services.date_query import UserDateQuery, format_user_date_label
+from services.payment_contact import payment_contact_label
 from services.settings import format_free_limit_label, get_free_daily_limit, is_free_unlimited
 
 DATE_EPISODES_PER_PAGE = 8
@@ -105,7 +105,7 @@ async def build_status_text(user: dict, *, is_admin: bool = False) -> str:
         lines.extend(
             [
                 "",
-                "Upgrade to VIP for unlimited episodes · ₹99/month",
+                f"Contact {payment_contact_label()} for VIP membership.",
             ]
         )
 
@@ -219,9 +219,8 @@ async def build_plan_text(user: dict) -> str:
         [
             "",
             free_line,
-            f"🎁 Invite friends — each join gives <b>5 bonus watches</b> (tap Refer & Watch).",
-            "VIP: unlimited access · ₹99/month",
-            "Single unlock: ₹10/episode",
+            f"Contact {payment_contact_label()} for payment and membership.",
+            "🎁 Invite friends — each join gives <b>5 bonus watches</b> (tap Refer & Watch).",
         ]
     )
     return "\n".join(lines)
@@ -268,7 +267,7 @@ async def build_episode_list_text(
         lines.extend(
             [
                 "",
-                "🔒 <b>Daily limit reached</b> — use bonus watches, VIP, or ₹10 unlock.",
+                "🔒 <b>Daily limit reached</b> — use bonus watches or contact for VIP/unlock.",
             ]
         )
     return "\n".join(lines), total_pages
@@ -327,7 +326,7 @@ async def build_date_episodes_text(
         lines.extend(
             [
                 "",
-                "🔒 <b>Daily limit reached</b> — use bonus watches, VIP, or ₹10 unlock.",
+                "🔒 <b>Daily limit reached</b> — use bonus watches or contact for VIP/unlock.",
             ]
         )
     return "\n".join(lines), total_pages

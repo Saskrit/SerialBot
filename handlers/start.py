@@ -5,10 +5,10 @@ from aiogram.types import Message
 
 from config import ADMIN_IDS
 from database import repository as repo
-from handlers.payment import begin_payment_upload
 from keyboards.inline import main_menu_keyboard, plan_keyboard
 from services.greetings import is_greeting, is_status_query
 from services.messages import build_status_text, build_user_info_text
+from services.payment_contact import send_payment_contact_message
 from services.referrals import parse_referral_start_arg, process_new_user_referral
 
 router = Router()
@@ -32,8 +32,7 @@ async def cmd_start(
     is_new_user: bool = False,
 ):
     if command.args and command.args.startswith("pay_"):
-        payment_id = command.args[len("pay_") :]
-        await begin_payment_upload(message, state, payment_id)
+        await send_payment_contact_message(message)
         return
 
     referrer_id = parse_referral_start_arg(command.args)

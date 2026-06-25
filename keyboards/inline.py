@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
-from config import EPISODE_UNLOCK_PRICE, EPISODES_PER_PAGE, SERIALS_PER_PAGE, VIP_MONTHLY_PRICE
+from config import EPISODES_PER_PAGE, PAYMENT_CONTACT_USERNAME, SERIALS_PER_PAGE
 from database import repository as repo
 from services.messages import DATE_EPISODES_PER_PAGE, format_date, format_month_year
 
@@ -252,17 +252,13 @@ async def date_episodes_keyboard(
 
 
 def limit_reached_keyboard(episode_id: str) -> InlineKeyboardMarkup:
+    _ = episode_id
+    contact = f"@{PAYMENT_CONTACT_USERNAME}"
     rows = [
         [
             InlineKeyboardButton(
-                text=f"🔓 Unlock Episode · ₹{EPISODE_UNLOCK_PRICE}",
-                callback_data=f"pay:unlock:{episode_id}",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text=f"⭐ VIP Monthly · ₹{VIP_MONTHLY_PRICE}",
-                callback_data="pay:vip",
+                text=f"💬 Contact {contact} for Payment",
+                url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
             )
         ],
         [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
@@ -271,27 +267,22 @@ def limit_reached_keyboard(episode_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def payment_instructions_keyboard(payment_id: str, bot_username: str) -> InlineKeyboardMarkup:
-    upload_url = f"https://t.me/{bot_username}?start=pay_{payment_id}"
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="📸 Upload Screenshot in Bot",
-                    url=upload_url,
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="❌ Cancel",
-                    callback_data=f"pay:cancel:{payment_id}",
-                )
-            ],
-        ]
-    )
+def payment_contact_keyboard() -> InlineKeyboardMarkup:
+    contact = f"@{PAYMENT_CONTACT_USERNAME}"
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"💬 Contact {contact}",
+                url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
+            )
+        ],
+    ]
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def vip_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
+    contact = f"@{PAYMENT_CONTACT_USERNAME}"
     if user and user.get("plan") == "vip":
         rows = [
             [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
@@ -299,7 +290,12 @@ def vip_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
         ]
     else:
         rows = [
-            [InlineKeyboardButton(text=f"⭐ Subscribe · ₹{VIP_MONTHLY_PRICE}/mo", callback_data="pay:vip")],
+            [
+                InlineKeyboardButton(
+                    text=f"💬 Contact {contact} for Membership",
+                    url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
+                )
+            ],
             [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
         ]
     append_ui_actions(rows)
@@ -307,13 +303,19 @@ def vip_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
 
 
 def plan_keyboard(user: dict | None = None) -> InlineKeyboardMarkup | None:
+    contact = f"@{PAYMENT_CONTACT_USERNAME}"
     if user and user.get("plan") == "vip":
         rows = [
             [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
         ]
     else:
         rows = [
-            [InlineKeyboardButton(text=f"⭐ Upgrade to VIP · ₹{VIP_MONTHLY_PRICE}", callback_data="pay:vip")],
+            [
+                InlineKeyboardButton(
+                    text=f"💬 Contact {contact} for Payment",
+                    url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
+                )
+            ],
             [InlineKeyboardButton(text="🎁 Refer & Watch", callback_data="refer")],
         ]
     append_ui_actions(rows)

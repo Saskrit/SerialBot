@@ -11,6 +11,7 @@ from services.serial_episodes import (
     show_serial_episodes_for_month,
     show_serial_month_picker,
 )
+from services.payment_contact import payment_contact_label
 from services.settings import format_free_limit_label, get_free_daily_limit, is_free_unlimited
 from services.trial_episodes import apply_trial_delivery, is_trial_watch
 
@@ -74,7 +75,7 @@ async def _send_daily_limit_message(bot, user_id: int, episode_id: str) -> None:
             f"{limit_line}\n"
             "Invite friends with 🎁 <b>Refer & Watch</b> — "
             "each join gives you 5 bonus watches.\n\n"
-            "Or unlock this episode for ₹10 / get VIP for unlimited access."
+            f"Or contact {payment_contact_label()} for VIP / episode unlock."
         ),
         reply_markup=limit_reached_keyboard(episode_id),
         parse_mode="HTML",
@@ -87,7 +88,7 @@ async def _send_trial_used_message(bot: Bot, user_id: int, episode_id: str) -> N
         text=(
             "🔒 <b>Trial episode used</b>\n\n"
             "You have already used this episode for trial.\n"
-            "Unlock it for ₹10 or get VIP to watch again anytime."
+            f"Contact {payment_contact_label()} for VIP or episode unlock."
         ),
         reply_markup=limit_reached_keyboard(episode_id),
         parse_mode="HTML",

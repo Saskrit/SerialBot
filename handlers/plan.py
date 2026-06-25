@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery, Message
 from database.datetime_utils import ensure_aware
 from keyboards.inline import plan_keyboard, vip_keyboard
 from services.messages import _vip_time_remaining, build_plan_text, format_date
+from services.payment_contact import payment_contact_label
 
 router = Router()
 
@@ -51,12 +52,12 @@ async def get_vip(message: Message, db_user: dict):
         return
 
     await message.answer(
-        "⭐ <b>VIP Monthly — ₹99</b>\n\n"
+        "⭐ <b>VIP Membership</b>\n\n"
         "• Unlimited episodes daily\n"
         "• Full archive access\n"
         "• Episode request priority\n"
         "• Priority support\n\n"
-        "Tap below to subscribe:",
+        f"Contact {payment_contact_label()} on Telegram for payment and membership:",
         reply_markup=vip_keyboard(db_user),
         parse_mode="HTML",
     )

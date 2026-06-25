@@ -44,6 +44,7 @@ if STORAGE_CHANNEL_ID:
 
 UPI_ID = os.getenv("UPI_ID", "serialhub@upi")
 PAYMENT_NAME = os.getenv("PAYMENT_NAME", "Serial Hub")
+PAYMENT_CONTACT_USERNAME = os.getenv("PAYMENT_CONTACT_USERNAME", "godthough")
 
 FREE_DAILY_LIMIT = 3
 REFERRAL_BONUS_WATCHES = 5
