@@ -45,6 +45,11 @@ SERIALS = [
     "aliases": [],
   },
   {
+    "name": "Mann Sundar",
+    "slug": "mann-sundar",
+    "aliases": ["mann sundar", "mansundar", "man sundar"],
+  },
+  {
     "name": "Mangal Lakshmi",
     "slug": "mangal-lakshmi",
     "aliases": ["mangal", "lakshmi"],

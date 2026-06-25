@@ -42,7 +42,17 @@ def _score_candidate(normalized_query: str, norm: str) -> float:
     ):
         return 0.7 + (len(normalized_query) / max(len(norm), 1)) * 0.2
 
-    return difflib.SequenceMatcher(None, normalized_query, norm).ratio()
+    score = difflib.SequenceMatcher(None, normalized_query, norm).ratio()
+
+    # Avoid "Mann Sundar" → Mannat style false positives (shared prefix, extra words).
+    if (
+        len(query_tokens) >= 2
+        and len(cand_tokens) < len(query_tokens)
+        and not _word_boundary_phrase(norm, normalized_query)
+    ):
+        score = min(score, 0.55)
+
+    return score
 
 
 async def match_serial(query: str) -> dict | None:
