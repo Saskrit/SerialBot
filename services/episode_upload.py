@@ -60,6 +60,7 @@ async def save_episode_from_message(
         file_id=file_id,
         file_unique_id=unique_id,
         message_id=message.message_id,
+        storage_channel_id=message.chat.id,
     )
 
     action = "saved" if created else "updated"
@@ -170,6 +171,7 @@ async def _save_from_parsed(
         file_id=file_id,
         file_unique_id=unique_id,
         message_id=video_message.message_id,
+        storage_channel_id=video_message.chat.id,
     )
     action = "saved" if created else "updated"
     success_text = (

@@ -728,6 +728,7 @@ async def upsert_episode(
     file_id: str,
     file_unique_id: str,
     message_id: int | None = None,
+    storage_channel_id: int | None = None,
 ) -> tuple[str, bool]:
     """Insert or update episode by serial + date. Returns (episode_id, created)."""
     db = get_db()
@@ -739,6 +740,7 @@ async def upsert_episode(
         "file_id": file_id,
         "file_unique_id": file_unique_id,
         "message_id": message_id,
+        "storage_channel_id": storage_channel_id,
         "uploaded_at": now,
         "view_count": 0,
     }
@@ -760,9 +762,16 @@ async def add_episode(
     file_id: str,
     file_unique_id: str,
     message_id: int | None = None,
+    storage_channel_id: int | None = None,
 ) -> str:
     ep_id, _ = await upsert_episode(
-        serial_slug, serial_name, episode_date, file_id, file_unique_id, message_id
+        serial_slug,
+        serial_name,
+        episode_date,
+        file_id,
+        file_unique_id,
+        message_id,
+        storage_channel_id,
     )
     return ep_id
 

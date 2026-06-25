@@ -26,6 +26,7 @@ ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET") or ADMIN_SECRET or "change-me"
 
 STORAGE_CHANNEL_ID = os.getenv("STORAGE_CHANNEL_ID")
+STORAGE_CHANNEL_IDS_RAW = os.getenv("STORAGE_CHANNEL_IDS", "")
 
 
 def _normalize_channel_id(value: str | None) -> int | None:
@@ -39,8 +40,26 @@ def _normalize_channel_id(value: str | None) -> int | None:
     return int(raw)
 
 
-if STORAGE_CHANNEL_ID:
-    STORAGE_CHANNEL_ID = _normalize_channel_id(STORAGE_CHANNEL_ID)
+def _load_storage_channel_ids() -> frozenset[int]:
+    ids: set[int] = set()
+    sources = [STORAGE_CHANNEL_IDS_RAW, STORAGE_CHANNEL_ID or ""]
+    for source in sources:
+        for part in source.replace(";", ",").split(","):
+            part = part.strip()
+            if not part:
+                continue
+            normalized = _normalize_channel_id(part)
+            if normalized is not None:
+                ids.add(normalized)
+    return frozenset(ids)
+
+
+STORAGE_CHANNEL_IDS: frozenset[int] = _load_storage_channel_ids()
+STORAGE_CHANNEL_ID = next(iter(STORAGE_CHANNEL_IDS), None)
+
+
+def is_storage_channel(chat_id: int) -> bool:
+    return chat_id in STORAGE_CHANNEL_IDS
 
 UPI_ID = os.getenv("UPI_ID", "serialhub@upi")
 PAYMENT_NAME = os.getenv("PAYMENT_NAME", "Serial Hub")

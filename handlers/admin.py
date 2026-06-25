@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bson import ObjectId
 
-from config import ADMIN_IDS, SERIALS_PER_PAGE, STORAGE_CHANNEL_ID
+from config import ADMIN_IDS, SERIALS_PER_PAGE, STORAGE_CHANNEL_IDS, is_storage_channel
 from database import repository as repo
 from database.connection import get_db
 from keyboards.inline import (
@@ -56,7 +56,7 @@ async def _notify_admins(bot, text: str) -> None:
 
 
 def _is_storage_chat(message: Message) -> bool:
-    return bool(STORAGE_CHANNEL_ID and message.chat.id == STORAGE_CHANNEL_ID)
+    return is_storage_channel(message.chat.id)
 
 
 async def process_storage_upload(message: Message, *, is_caption_edit: bool = False) -> None:
@@ -83,10 +83,18 @@ async def storage_info(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    lines = [
-        "📦 <b>Storage setup</b>",
-        f"Configured ID: <code>{STORAGE_CHANNEL_ID or 'not set'}</code>",
-    ]
+    if STORAGE_CHANNEL_IDS:
+        configured = "\n".join(f"• <code>{cid}</code>" for cid in sorted(STORAGE_CHANNEL_IDS))
+        lines = [
+            "📦 <b>Storage setup</b>",
+            f"<b>{len(STORAGE_CHANNEL_IDS)}</b> channel(s) configured:",
+            configured,
+        ]
+    else:
+        lines = [
+            "📦 <b>Storage setup</b>",
+            "Configured channels: <code>not set</code>",
+        ]
     if message.chat.type in ("channel", "supergroup", "group"):
         lines.append(f"This chat ID: <code>{message.chat.id}</code>")
 
@@ -99,11 +107,13 @@ async def storage_info(message: Message):
             "",
             "<b>New serial?</b> Use <code>/addserial Serial Name</code> first.",
             "",
-            "In your <b>private storage channel</b>:",
+            "In your <b>storage channel(s)</b>:",
             "1. Post video with caption, or edit caption later",
             "2. Reply to video with <code>/addepisode</code>",
             "",
-            "Bot must be <b>admin</b> in the storage channel.",
+            "Bot must be <b>admin</b> in each storage channel.",
+            "",
+            "Set <code>STORAGE_CHANNEL_IDS</code> (comma-separated) or <code>STORAGE_CHANNEL_ID</code>.",
         ]
     )
     await message.answer("\n".join(lines), parse_mode="HTML")
@@ -1330,13 +1340,13 @@ async def storage_channel_upload_edited(message: Message):
     await process_storage_upload(message, is_caption_edit=True)
 
 
-if STORAGE_CHANNEL_ID:
+if STORAGE_CHANNEL_IDS:
 
-    @router.message(F.chat.id == STORAGE_CHANNEL_ID, F.video | F.document)
+    @router.message(F.chat.id.in_(STORAGE_CHANNEL_IDS), F.video | F.document)
     async def storage_group_upload(message: Message):
         await process_storage_upload(message)
 
-    @router.edited_message(F.chat.id == STORAGE_CHANNEL_ID, F.video | F.document)
+    @router.edited_message(F.chat.id.in_(STORAGE_CHANNEL_IDS), F.video | F.document)
     async def storage_group_upload_edited(message: Message):
         await process_storage_upload(message, is_caption_edit=True)
 
