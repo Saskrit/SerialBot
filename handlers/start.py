@@ -4,10 +4,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from config import ADMIN_IDS
+from database import repository as repo
 from handlers.payment import begin_payment_upload
 from keyboards.inline import main_menu_keyboard, plan_keyboard
 from services.greetings import is_greeting, is_status_query
 from services.messages import build_status_text, build_user_info_text
+from services.referrals import parse_referral_start_arg, process_new_user_referral
 
 router = Router()
 
@@ -27,11 +29,19 @@ async def cmd_start(
     command: CommandObject,
     state: FSMContext,
     db_user: dict,
+    is_new_user: bool = False,
 ):
     if command.args and command.args.startswith("pay_"):
         payment_id = command.args[len("pay_") :]
         await begin_payment_upload(message, state, payment_id)
         return
+
+    referrer_id = parse_referral_start_arg(command.args)
+    if is_new_user and referrer_id:
+        await process_new_user_referral(message.bot, message.from_user.id, referrer_id)
+        refreshed = await repo.get_user(message.from_user.id)
+        if refreshed:
+            db_user = refreshed
 
     is_admin = message.from_user.id in ADMIN_IDS
     await message.answer(

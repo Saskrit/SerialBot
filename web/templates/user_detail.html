@@ -25,6 +25,9 @@
       <dt>VIP expires</dt><dd>{% if user.vip_expires %}{{ format_date(user.vip_expires) }}{% else %}—{% endif %}</dd>
       <dt>Daily watches</dt><dd>{{ user.daily_watches }}{% if user.plan != 'vip' %} / {{ free_limit if free_limit > 0 else '∞' }}{% endif %}</dd>
       <dt>Unlocked episodes</dt><dd>{{ user.unlocked_episodes|length if user.unlocked_episodes else 0 }}</dd>
+      <dt>Referral invites</dt><dd>{{ user.referral_count or 0 }}</dd>
+      <dt>Bonus watches</dt><dd>{{ user.referral_watch_credits or 0 }}</dd>
+      <dt>Referred by</dt><dd>{% if user.referred_by %}<code>{{ user.referred_by }}</code>{% else %}—{% endif %}</dd>
       <dt>Banned</dt><dd>{{ 'Yes' if user.banned else 'No' }}</dd>
       <dt>Registered</dt><dd>{% if user.registered_at %}{{ format_datetime(user.registered_at) }}{% else %}—{% endif %}</dd>
       <dt>Last active</dt><dd>{% if user.last_active %}{{ format_datetime(user.last_active) }}{% else %}—{% endif %}</dd>

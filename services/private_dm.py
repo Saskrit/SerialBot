@@ -20,6 +20,10 @@ def payment_deep_link(bot_username: str, payment_id: str) -> str:
     return f"https://t.me/{bot_username}?start=pay_{payment_id}"
 
 
+def referral_deep_link(bot_username: str, telegram_id: int) -> str:
+    return f"https://t.me/{bot_username}?start=ref_{telegram_id}"
+
+
 async def send_private_message(bot: Bot, user_id: int, text: str, **kwargs) -> bool:
     try:
         await bot.send_message(chat_id=user_id, text=text, **kwargs)

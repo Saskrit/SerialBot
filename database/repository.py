@@ -3,6 +3,8 @@ from typing import Any
 
 from bson import ObjectId
 
+from pymongo import ReturnDocument
+
 from config import TZ
 from services.settings import get_free_daily_limit, is_free_unlimited
 from database.connection import get_db
@@ -47,6 +49,9 @@ async def get_or_create_user(
         "vip_expires": None,
         "daily_watches": 0,
         "daily_reset_date": _today().isoformat(),
+        "referral_watch_credits": 0,
+        "referral_count": 0,
+        "referred_by": None,
         "unlocked_episodes": [],
         "trial_episodes": [],
         "banned": False,
@@ -108,7 +113,7 @@ async def record_episode_view(
     episode_id: str,
     *,
     counts_toward_daily_limit: bool = False,
-) -> None:
+) -> str | None:
     db = get_db()
     now = datetime.now(TZ)
     update: dict[str, Any] = {
@@ -124,8 +129,19 @@ async def record_episode_view(
             }
         },
     }
+    consumption: str | None = None
     if counts_toward_daily_limit:
-        update["$inc"] = {"daily_watches": 1}
+        user = await db.users.find_one({"telegram_id": telegram_id})
+        if user:
+            limit = await get_free_daily_limit()
+            daily_used = user.get("daily_watches", 0)
+            bonus = user.get("referral_watch_credits", 0)
+            if is_free_unlimited(limit) or daily_used < limit:
+                update["$inc"] = {"daily_watches": 1}
+                consumption = "daily"
+            elif bonus > 0:
+                update["$inc"] = {"referral_watch_credits": -1}
+                consumption = "bonus"
 
     await db.users.update_one({"telegram_id": telegram_id}, update)
 
@@ -134,6 +150,7 @@ async def record_episode_view(
             {"_id": ObjectId(episode_id)},
             {"$inc": {"view_count": 1}},
         )
+    return consumption
 
 
 async def get_total_episode_views() -> int:
@@ -257,6 +274,55 @@ async def grant_episode_unlock(telegram_id: int, episode_id: str) -> None:
     )
 
 
+async def has_free_watch_allowance(user: dict[str, Any]) -> bool:
+    if user.get("plan") == "vip":
+        return True
+    limit = await get_free_daily_limit()
+    if is_free_unlimited(limit):
+        return True
+    if user.get("daily_watches", 0) < limit:
+        return True
+    if user.get("referral_watch_credits", 0) > 0:
+        return True
+    return False
+
+
+async def apply_referral(
+    new_user_id: int, referrer_id: int, *, bonus_watches: int
+) -> tuple[bool, str, int | None]:
+    if new_user_id == referrer_id:
+        return False, "self_referral", None
+
+    db = get_db()
+    referrer = await db.users.find_one({"telegram_id": referrer_id})
+    if not referrer:
+        return False, "referrer_not_found", None
+
+    referred = await db.users.find_one_and_update(
+        {
+            "telegram_id": new_user_id,
+            "$or": [{"referred_by": None}, {"referred_by": {"$exists": False}}],
+        },
+        {"$set": {"referred_by": referrer_id}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not referred:
+        return False, "already_referred", None
+
+    await db.users.update_one(
+        {"telegram_id": referrer_id},
+        {
+            "$inc": {
+                "referral_watch_credits": bonus_watches,
+                "referral_count": 1,
+            }
+        },
+    )
+    updated_referrer = await db.users.find_one({"telegram_id": referrer_id})
+    credits = updated_referrer.get("referral_watch_credits", 0) if updated_referrer else bonus_watches
+    return True, "ok", credits
+
+
 async def has_episode_unlock(user: dict[str, Any], episode_id: str) -> bool:
     return episode_id in user.get("unlocked_episodes", [])
 
@@ -275,7 +341,7 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
         return False, "trial_used"
 
     limit = await get_free_daily_limit()
-    if not is_free_unlimited(limit) and user.get("daily_watches", 0) >= limit:
+    if not is_free_unlimited(limit) and not await has_free_watch_allowance(user):
         return False, "daily_limit"
 
     return True, ""
@@ -349,7 +415,7 @@ async def is_episode_daily_locked(user: dict[str, Any], episode_id: str) -> bool
     limit = await get_free_daily_limit()
     if is_free_unlimited(limit):
         return False
-    return user.get("daily_watches", 0) >= limit
+    return not await has_free_watch_allowance(user)
 
 
 async def is_episode_locked_for_user(user: dict[str, Any], episode_id: str) -> bool:

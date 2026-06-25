@@ -42,6 +42,7 @@ def main_menu_keyboard(user: dict | None = None) -> ReplyKeyboardMarkup:
                 KeyboardButton(text="📺 Request Episode"),
                 KeyboardButton(text="💬 Support"),
             ],
+            [KeyboardButton(text="🎁 Refer & Watch")],
             [KeyboardButton(text="❌ Close Menu")],
         ],
         resize_keyboard=True,
@@ -313,6 +314,7 @@ def plan_keyboard(user: dict | None = None) -> InlineKeyboardMarkup | None:
     else:
         rows = [
             [InlineKeyboardButton(text=f"⭐ Upgrade to VIP · ₹{VIP_MONTHLY_PRICE}", callback_data="pay:vip")],
+            [InlineKeyboardButton(text="🎁 Refer & Watch", callback_data="refer")],
         ]
     append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)

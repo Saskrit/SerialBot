@@ -25,12 +25,17 @@ def plan_label(user: dict) -> str:
 
 def _usage_summary(user: dict, *, daily_limit: int) -> str:
     watched = user.get("daily_watches", 0)
+    bonus = user.get("referral_watch_credits", 0)
     if user.get("plan") == "vip":
         return "Unlimited (VIP)"
     if is_free_unlimited(daily_limit):
-        return f"{watched} watched today · unlimited free access"
-    remaining = max(0, daily_limit - watched)
-    return f"{watched}/{daily_limit} used · {remaining} left today"
+        base = f"{watched} watched today · unlimited free access"
+    else:
+        remaining = max(0, daily_limit - watched)
+        base = f"{watched}/{daily_limit} daily · {remaining} left today"
+    if bonus > 0:
+        base += f" · {bonus} bonus invite watch(es)"
+    return base
 
 
 async def usage_summary(user: dict) -> str:
@@ -200,6 +205,11 @@ async def build_plan_text(user: dict) -> str:
     if unlocks:
         lines.append(f"Active unlocks: <b>{len(unlocks)}</b> episode(s)")
 
+    invites = user.get("referral_count", 0)
+    bonus = user.get("referral_watch_credits", 0)
+    if invites or bonus:
+        lines.append(f"Referrals: <b>{invites}</b> invite(s) · <b>{bonus}</b> bonus watch(es)")
+
     free_line = (
         "Free users have unlimited daily episodes."
         if is_free_unlimited(daily_limit)
@@ -209,6 +219,7 @@ async def build_plan_text(user: dict) -> str:
         [
             "",
             free_line,
+            f"🎁 Invite friends — each join gives <b>5 bonus watches</b> (tap Refer & Watch).",
             "VIP: unlimited access · ₹99/month",
             "Single unlock: ₹10/episode",
         ]
@@ -252,12 +263,12 @@ async def build_episode_list_text(
         user
         and user.get("plan") != "vip"
         and not is_free_unlimited(limit)
-        and user.get("daily_watches", 0) >= limit
+        and not await repo.has_free_watch_allowance(user)
     ):
         lines.extend(
             [
                 "",
-                "🔒 <b>Daily limit reached</b> — locked episodes need VIP or ₹10 unlock.",
+                "🔒 <b>Daily limit reached</b> — use bonus watches, VIP, or ₹10 unlock.",
             ]
         )
     return "\n".join(lines), total_pages
@@ -311,12 +322,12 @@ async def build_date_episodes_text(
         user
         and user.get("plan") != "vip"
         and not is_free_unlimited(limit)
-        and user.get("daily_watches", 0) >= limit
+        and not await repo.has_free_watch_allowance(user)
     ):
         lines.extend(
             [
                 "",
-                "🔒 <b>Daily limit reached</b> — locked episodes need VIP or ₹10 unlock.",
+                "🔒 <b>Daily limit reached</b> — use bonus watches, VIP, or ₹10 unlock.",
             ]
         )
     return "\n".join(lines), total_pages

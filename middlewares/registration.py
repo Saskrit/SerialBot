@@ -42,6 +42,7 @@ class UserRegistrationMiddleware(BaseMiddleware):
 
         if user:
             data["db_user"] = user
+            data["is_new_user"] = is_new_user
             if is_new_user and event.from_user:
                 try:
                     await notify_admins_new_user(

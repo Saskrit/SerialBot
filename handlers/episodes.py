@@ -72,7 +72,9 @@ async def _send_daily_limit_message(bot, user_id: int, episode_id: str) -> None:
         text=(
             "⏳ <b>Daily limit reached</b>\n\n"
             f"{limit_line}\n"
-            "Unlock this episode for ₹10 or get VIP for unlimited access."
+            "Invite friends with 🎁 <b>Refer & Watch</b> — "
+            "each join gives you 5 bonus watches.\n\n"
+            "Or unlock this episode for ₹10 / get VIP for unlimited access."
         ),
         reply_markup=limit_reached_keyboard(episode_id),
         parse_mode="HTML",
@@ -103,11 +105,15 @@ async def _finalize_episode_watch(
         db_user.get("plan") != "vip"
         and episode_id not in db_user.get("unlocked_episodes", [])
     )
-    await repo.record_episode_view(
+    consumption = await repo.record_episode_view(
         user_id, episode_id, counts_toward_daily_limit=counts_toward_limit
     )
-    if counts_toward_limit:
+    if consumption == "daily":
         db_user["daily_watches"] = db_user.get("daily_watches", 0) + 1
+    elif consumption == "bonus":
+        db_user["referral_watch_credits"] = max(
+            0, db_user.get("referral_watch_credits", 0) - 1
+        )
 
     if dm_message_id and await is_trial_watch(db_user, episode_id):
         await apply_trial_delivery(
