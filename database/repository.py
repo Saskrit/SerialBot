@@ -567,6 +567,56 @@ async def create_serial(
     return doc, ""
 
 
+async def list_serials_admin(
+    page: int, per_page: int
+) -> tuple[list[dict[str, Any]], int]:
+    db = get_db()
+    total = await db.serials.count_documents({"active": True})
+    cursor = (
+        db.serials.find({"active": True})
+        .sort("name", 1)
+        .skip(page * per_page)
+        .limit(per_page)
+    )
+    serials = await cursor.to_list(length=per_page)
+    for serial in serials:
+        serial["episode_count"] = await db.episodes.count_documents(
+            {"serial_slug": serial["slug"]}
+        )
+    return serials, total
+
+
+async def delete_serial(serial_slug: str) -> tuple[dict[str, Any] | None, int]:
+    db = get_db()
+    serial = await db.serials.find_one({"slug": serial_slug, "active": True})
+    if not serial:
+        return None, 0
+
+    ep_count = await db.episodes.count_documents({"serial_slug": serial_slug})
+    if ep_count:
+        cursor = db.episodes.find({"serial_slug": serial_slug}, {"_id": 1})
+        async for doc in cursor:
+            ep_id = str(doc["_id"])
+            await db.users.update_many(
+                {"unlocked_episodes": ep_id},
+                {"$pull": {"unlocked_episodes": ep_id}},
+            )
+        await db.episodes.delete_many({"serial_slug": serial_slug})
+
+    now = datetime.now(TZ)
+    await db.serials.update_one(
+        {"slug": serial_slug},
+        {
+            "$set": {
+                "active": False,
+                "deleted_at": now,
+                "deleted_by_admin": True,
+            }
+        },
+    )
+    return serial, ep_count
+
+
 async def list_serials() -> list[dict[str, Any]]:
     cursor = get_db().serials.find({"active": True}).sort("name", 1)
     return await cursor.to_list(length=200)

@@ -8,14 +8,16 @@ from aiogram.types import CallbackQuery, Message
 
 from bson import ObjectId
 
-from config import ADMIN_IDS, STORAGE_CHANNEL_ID
+from config import ADMIN_IDS, SERIALS_PER_PAGE, STORAGE_CHANNEL_ID
 from database import repository as repo
 from database.connection import get_db
 from keyboards.inline import (
     admin_delete_episode_confirm_keyboard,
+    admin_delete_serial_confirm_keyboard,
     admin_episodes_keyboard,
     admin_free_limit_keyboard,
     admin_menu_keyboard,
+    admin_serials_delete_keyboard,
     admin_user_keyboard,
     admin_users_keyboard,
 )
@@ -169,6 +171,175 @@ async def admin_add_serial_name(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     await _add_serial_from_text(message, message.text.strip(), state)
+
+
+async def _send_admin_serial_delete_list(
+    target: Message | CallbackQuery, page: int
+) -> None:
+    serials, total = await repo.list_serials_admin(page, SERIALS_PER_PAGE)
+    if total == 0:
+        text = "🗑 <b>Delete Serial</b>\n\nNo active serials in catalog."
+        keyboard = admin_menu_keyboard()
+    else:
+        total_pages = max(1, (total + SERIALS_PER_PAGE - 1) // SERIALS_PER_PAGE)
+        page = max(0, min(page, total_pages - 1))
+        text = (
+            f"🗑 <b>Delete Serial</b>\n\n"
+            f"Page {page + 1}/{total_pages} · {total} serial(s)\n\n"
+            "Tap a serial to remove it from the bot.\n"
+            "<i>All its episodes will also be deleted.</i>"
+        )
+        keyboard = await admin_serials_delete_keyboard(page)
+
+    if isinstance(target, CallbackQuery):
+        await target.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        await target.answer()
+    else:
+        await target.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.message(Command("delserial"))
+async def delserial_cmd(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split()
+    if len(parts) < 2:
+        await _send_admin_serial_delete_list(message, 0)
+        return
+
+    from services.serial_matcher import match_serial
+
+    confirm = len(parts) >= 3 and parts[-1].lower() == "confirm"
+    query = " ".join(parts[1:-1] if confirm else parts[1:])
+
+    slug = query.lower().replace(" ", "-")
+    serial = await repo.get_serial_by_slug(slug)
+    if not serial or not serial.get("active", True):
+        serial = await match_serial(query)
+    if not serial or not serial.get("active", True):
+        await message.answer("Serial not found.")
+        return
+
+    if confirm:
+        deleted, ep_deleted = await repo.delete_serial(serial["slug"])
+        if not deleted:
+            await message.answer("Serial not found or already deleted.")
+            return
+        await message.answer(
+            f"🗑 Deleted <b>{deleted['name']}</b> "
+            f"and <b>{ep_deleted}</b> episode(s).",
+            parse_mode="HTML",
+        )
+        await state.clear()
+        return
+
+    ep_count = await get_db().episodes.count_documents({"serial_slug": serial["slug"]})
+    await message.answer(
+        f"🗑 <b>Delete this serial?</b>\n\n"
+        f"Serial: <b>{serial['name']}</b>\n"
+        f"Slug: <code>{serial['slug']}</code>\n"
+        f"Episodes: <b>{ep_count}</b>\n\n"
+        f"Confirm: <code>/delserial {serial['slug']} confirm</code>",
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("admin:delserial:"))
+async def admin_delete_serial_list(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    page = int(callback.data.split(":", 2)[2])
+    await _send_admin_serial_delete_list(callback, page)
+
+
+@router.callback_query(F.data == "admin:delserial")
+async def admin_delete_serial_start(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    await state.clear()
+    await _send_admin_serial_delete_list(callback, 0)
+
+
+@router.callback_query(F.data.startswith("admin:delser:"))
+async def admin_delete_serial_confirm(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    slug = callback.data.split(":", 2)[2]
+    if slug.startswith("ok:"):
+        return
+
+    serial = await repo.get_serial_by_slug(slug)
+    if not serial or not serial.get("active", True):
+        await callback.answer("Serial not found.", show_alert=True)
+        return
+
+    ep_count = await get_db().episodes.count_documents({"serial_slug": slug})
+    text = (
+        f"🗑 <b>Delete this serial?</b>\n\n"
+        f"Serial: <b>{serial['name']}</b>\n"
+        f"Slug: <code>{slug}</code>\n"
+        f"Episodes to remove: <b>{ep_count}</b>\n\n"
+        "This cannot be undone."
+    )
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_delete_serial_confirm_keyboard(slug),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:delserok:"))
+async def admin_delete_serial_execute(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    slug = callback.data.split(":", 2)[2]
+    serial, ep_deleted = await repo.delete_serial(slug)
+    if not serial:
+        await callback.answer("Serial not found.", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"🗑 Deleted <b>{serial['name']}</b> "
+        f"and <b>{ep_deleted}</b> episode(s).",
+        reply_markup=admin_menu_keyboard(),
+        parse_mode="HTML",
+    )
+    await callback.answer("Serial deleted ✅")
+
+
+@router.message(AdminStates.delete_serial_lookup)
+async def admin_delete_serial_by_name(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    from services.serial_matcher import match_serial
+
+    query = message.text.strip()
+    slug = query.lower().replace(" ", "-")
+    serial = await repo.get_serial_by_slug(slug)
+    if not serial or not serial.get("active", True):
+        serial = await match_serial(query)
+    if not serial or not serial.get("active", True):
+        await message.answer("Serial not found. Try again or send /admin to cancel.")
+        return
+
+    await state.clear()
+    ep_count = await get_db().episodes.count_documents({"serial_slug": serial["slug"]})
+    await message.answer(
+        f"🗑 <b>Delete this serial?</b>\n\n"
+        f"Serial: <b>{serial['name']}</b>\n"
+        f"Episodes: <b>{ep_count}</b>",
+        reply_markup=admin_delete_serial_confirm_keyboard(serial["slug"]),
+        parse_mode="HTML",
+    )
 
 
 @router.message(Command("episodes"))

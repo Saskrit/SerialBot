@@ -381,11 +381,67 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin:broadcast")],
         [InlineKeyboardButton(text="⭐ Grant VIP", callback_data="admin:grantvip")],
         [InlineKeyboardButton(text="➕ Add Serial", callback_data="admin:addserial")],
+        [InlineKeyboardButton(text="🗑 Delete Serial", callback_data="admin:delserial:0")],
         [InlineKeyboardButton(text="🗑 Manage Episodes", callback_data="admin:deleps")],
         [InlineKeyboardButton(text="👤 Manage User", callback_data="admin:user")],
     ]
     append_ui_actions(rows, include_home=False)
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def admin_serials_delete_keyboard(page: int) -> InlineKeyboardMarkup:
+    serials, total = await repo.list_serials_admin(page, SERIALS_PER_PAGE)
+    rows: list[list[InlineKeyboardButton]] = []
+
+    for serial in serials:
+        count = serial.get("episode_count", 0)
+        label = f"🗑 {serial['name']} ({count} ep)"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"admin:delser:{serial['slug']}",
+                )
+            ]
+        )
+
+    total_pages = max(1, (total + SERIALS_PER_PAGE - 1) // SERIALS_PER_PAGE)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(
+                text="◀ Prev", callback_data=f"admin:delserial:{page - 1}"
+            )
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="Next ▶", callback_data=f"admin:delserial:{page + 1}"
+            )
+        )
+    if nav:
+        rows.append(nav)
+
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    append_ui_actions(rows, include_home=False)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def admin_delete_serial_confirm_keyboard(serial_slug: str, page: int = 0) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Yes, delete serial",
+                    callback_data=f"admin:delserok:{serial_slug}",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Cancel",
+                    callback_data=f"admin:delserial:{page}",
+                ),
+            ]
+        ]
+    )
 
 
 def admin_users_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:

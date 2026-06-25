@@ -175,13 +175,17 @@ async def seed_serials(database) -> int:
 async def refresh_serial_catalog(database) -> None:
     for serial in SERIALS:
         await database.serials.update_one(
-            {"slug": serial["slug"]},
+            {"slug": serial["slug"], "deleted_by_admin": {"$ne": True}},
             {
                 "$set": {
                     "name": serial["name"],
                     "aliases": serial["aliases"],
                     "active": True,
-                }
+                },
+                "$setOnInsert": {
+                    "slug": serial["slug"],
+                    "deleted_by_admin": False,
+                },
             },
             upsert=True,
         )
