@@ -1,0 +1,19 @@
+/* Broadcast — scoped */
+
+.page-broadcast {
+  max-width: 720px;
+}
+
+.page-broadcast .broadcast-form {
+  background: var(--surface-warm);
+  border: 1px solid var(--border-strong);
+}
+
+.page-broadcast textarea {
+  min-height: 200px;
+  background: var(--surface);
+}
+
+.page-broadcast .btn-primary {
+  min-width: 160px;
+}

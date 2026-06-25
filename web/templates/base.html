@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Serial Hub Admin{% endblock %}</title>
-  <link rel="stylesheet" href="/admin/static/style.css">
+  <link rel="stylesheet" href="/admin/static/base.css">
+  {% block page_css %}{% endblock %}
 </head>
 <body>
   {% if admin_id %}

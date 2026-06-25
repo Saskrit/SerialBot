@@ -1,0 +1,39 @@
+/* User detail — scoped */
+
+.page-user-detail {
+  max-width: 1100px;
+}
+
+.page-user-detail > p a {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.page-user-detail .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.page-user-detail .card:nth-child(2) {
+  background: var(--surface-warm);
+}
+
+.page-user-detail .inline-form {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-user-detail .inline-form:last-of-type {
+  border-bottom: none;
+}
+
+.page-user-detail .detail-list dd {
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .page-user-detail .two-col {
+    grid-template-columns: 1fr;
+  }
+}

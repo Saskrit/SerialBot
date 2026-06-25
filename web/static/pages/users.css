@@ -1,0 +1,22 @@
+/* Users list — scoped */
+
+.page-users {
+  max-width: 1200px;
+}
+
+.page-users .page-header .search-form {
+  margin: 0;
+}
+
+.page-users .page-header input[type="text"] {
+  min-width: 220px;
+}
+
+.page-users .table-wrap tbody tr:hover td {
+  background: var(--cream-50);
+}
+
+.page-users code {
+  color: var(--brand);
+  font-weight: 600;
+}

@@ -1,0 +1,45 @@
+/* Episode detail / watchers — scoped */
+
+.page-episode-detail {
+  max-width: 1100px;
+}
+
+.page-episode-detail > p {
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.page-episode-detail .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-episode-detail .stat-card {
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+}
+
+.page-episode-detail .stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--brand);
+  letter-spacing: -0.04em;
+}
+
+.page-episode-detail .stat-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-episode-detail .table-wrap tbody tr:hover td {
+  background: var(--cream-50);
+}

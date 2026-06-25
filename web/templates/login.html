@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Login — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/login.css">{% endblock %}
 {% block body %}
-<div class="login-page">
+<div class="page-login">
   <form class="login-card" method="post" action="/admin/login">
     <h1>Serial Hub Admin</h1>
     <p class="muted">Sign in with your Telegram ID and admin password.</p>

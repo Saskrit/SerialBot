@@ -1,0 +1,30 @@
+/* Serials list — scoped */
+
+.page-serials {
+  max-width: 1200px;
+}
+
+.page-serials .table-wrap tbody tr:hover td {
+  background: var(--cream-50);
+}
+
+.page-serials td strong {
+  color: var(--text);
+}
+
+.page-serials .table-actions .btn-sm:not(.btn-danger) {
+  border-color: var(--border);
+}
+
+.page-serials .pagination a {
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--cream-100);
+  border: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.page-serials .pagination a:hover {
+  background: var(--cream-200);
+  color: var(--brand);
+}

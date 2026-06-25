@@ -1,0 +1,47 @@
+/* Login page — scoped */
+
+.page-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--cream-50);
+}
+
+.page-login .login-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  box-shadow: var(--shadow-md);
+}
+
+.page-login .login-card h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--brand);
+  letter-spacing: -0.03em;
+}
+
+.page-login .login-card .muted {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.page-login .login-card label {
+  width: 100%;
+}
+
+.page-login .login-card .btn-primary {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.25rem;
+}

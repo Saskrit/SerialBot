@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Settings — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/settings.css">{% endblock %}
 {% block content %}
+<div class="page page-settings">
 <div class="page-header">
   <div>
     <h1>Settings</h1>
@@ -54,5 +56,6 @@
     </form>
     {% endfor %}
   </div>
+</div>
 </div>
 {% endblock %}

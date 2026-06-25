@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/dashboard.css">{% endblock %}
 {% block content %}
+<div class="page page-dashboard">
 <div class="page-header">
   <div>
     <h1>Dashboard</h1>
@@ -75,4 +77,5 @@
 </div>
 
 <p class="muted">Logged in as admin <code>{{ admin_id }}</code>.</p>
+</div>
 {% endblock %}

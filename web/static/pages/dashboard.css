@@ -1,0 +1,77 @@
+/* Dashboard — scoped */
+
+.page-dashboard {
+  max-width: 1200px;
+}
+
+.page-dashboard .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+
+.page-dashboard .stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.15rem 1.2rem;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.page-dashboard .stat-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.page-dashboard .stat-card.highlight {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.page-dashboard .stat-value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.page-dashboard .stat-card.highlight .stat-value {
+  color: var(--brand);
+}
+
+.page-dashboard .stat-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-dashboard .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.page-dashboard .card .detail-list dd {
+  color: var(--brand);
+}
+
+.page-dashboard .table-actions {
+  margin-top: 0.25rem;
+}
+
+.page-dashboard > .muted {
+  margin-top: 1.5rem;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 900px) {
+  .page-dashboard .two-col {
+    grid-template-columns: 1fr;
+  }
+}

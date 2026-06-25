@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Payments — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/payments.css">{% endblock %}
 {% block content %}
+<div class="page page-payments">
 <div class="page-header">
   <div>
     <h1>Pending payments</h1>
@@ -35,4 +37,5 @@
   {% endfor %}
 </div>
 {% endif %}
+</div>
 {% endblock %}

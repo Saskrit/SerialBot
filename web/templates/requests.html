@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Episode requests — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/requests.css">{% endblock %}
 {% block content %}
+<div class="page page-requests">
 <div class="page-header">
   <div>
     <h1>Episode requests</h1>
@@ -34,4 +36,5 @@
 </table>
 </div>
 {% endif %}
+</div>
 {% endblock %}

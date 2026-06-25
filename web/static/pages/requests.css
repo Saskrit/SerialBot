@@ -1,0 +1,22 @@
+/* Episode requests — scoped */
+
+.page-requests {
+  max-width: 1100px;
+}
+
+.page-requests .table-wrap tbody tr:hover td {
+  background: var(--cream-50);
+}
+
+.page-requests td a {
+  font-weight: 700;
+}
+
+.page-requests .btn-ghost {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.page-requests .btn-ghost:hover {
+  background: var(--brand-soft);
+}

@@ -1,0 +1,47 @@
+/* Support tickets — scoped */
+
+.page-support {
+  max-width: 900px;
+}
+
+.page-support .ticket-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.3rem;
+  margin-bottom: 1.1rem;
+  box-shadow: var(--shadow);
+}
+
+.page-support .ticket-meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+  font-size: 0.88rem;
+  align-items: center;
+}
+
+.page-support .ticket-meta .badge {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.page-support .ticket-message {
+  white-space: pre-wrap;
+  background: var(--cream-100);
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.page-support .reply-form {
+  margin-top: 0.85rem;
+}
+
+.page-support .reply-form textarea {
+  margin-bottom: 0.65rem;
+}

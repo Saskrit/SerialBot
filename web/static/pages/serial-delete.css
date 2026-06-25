@@ -1,0 +1,24 @@
+/* Serial delete confirm — scoped */
+
+.page-serial-delete {
+  max-width: 640px;
+}
+
+.page-serial-delete .warning-box {
+  background: var(--danger-soft);
+  border: 1px solid #ffc9d0;
+  color: var(--brand-hover);
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.page-serial-delete .warning-box strong {
+  color: var(--brand);
+}
+
+.page-serial-delete .card {
+  border-color: var(--brand);
+}

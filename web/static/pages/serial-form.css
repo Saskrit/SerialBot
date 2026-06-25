@@ -1,0 +1,29 @@
+/* Serial add / edit — scoped */
+
+.page-serial-form {
+  max-width: 640px;
+}
+
+.page-serial-form > p a {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.page-serial-form .card {
+  background: var(--surface-warm);
+  border-color: var(--border-strong);
+}
+
+.page-serial-form .form-stack {
+  max-width: none;
+}
+
+.page-serial-form input[disabled] {
+  background: var(--cream-50);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.page-serial-form .table-actions {
+  margin-top: 0.5rem;
+}

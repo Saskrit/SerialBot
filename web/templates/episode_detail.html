@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Episode stats — {{ format_date(episode.date) }}{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/episode-detail.css">{% endblock %}
 {% block content %}
+<div class="page page-episode-detail">
 <p>
   <a href="/admin/episodes/stats?slug={{ slug }}&page={{ page }}">← Back to stats</a>
   · <a href="/admin/episodes?slug={{ slug }}">Manage episodes</a>
@@ -69,5 +71,6 @@
   {% else %}
   <p class="muted">No watchers recorded yet.</p>
   {% endif %}
+</div>
 </div>
 {% endblock %}

@@ -428,21 +428,23 @@ async def episode_delete_by_date(request: web.Request) -> web.Response:
 @require_admin
 async def episode_stats_index(request: web.Request) -> web.Response:
     slug = request.rel_url.query.get("slug", "").strip().lower().replace(" ", "-")
-    page = max(0, int(request.rel_url.query.get("page", "0")))
     serials = await repo.list_serials()
+    top_episodes = await repo.get_top_viewed_episodes(10)
 
     serial = None
-    episodes = []
+    all_episodes: list = []
     total = 0
-    total_pages = 1
-    page_views = 0
+    serial_total_views = 0
+    top_serial_ids: set[str] = set()
 
     if slug:
         serial = await repo.get_serial_by_slug(slug)
         if serial:
-            episodes, total = await repo.get_episodes(slug, page, EPISODES_PER_PAGE)
-            total_pages = max(1, (total + EPISODES_PER_PAGE - 1) // EPISODES_PER_PAGE)
-            page_views = sum(ep.get("view_count", 0) for ep in episodes)
+            all_episodes = await repo.get_all_episodes_for_serial(slug)
+            total = len(all_episodes)
+            serial_total_views = await repo.get_serial_episode_view_total(slug)
+            top_for_serial = await repo.get_top_viewed_episodes(10, serial_slug=slug)
+            top_serial_ids = {str(ep["_id"]) for ep in top_for_serial}
 
     return _html(
         "episode_stats.html",
@@ -451,11 +453,11 @@ async def episode_stats_index(request: web.Request) -> web.Response:
         serials=serials,
         serial=serial,
         slug=slug,
-        episodes=episodes,
-        page=page,
+        top_episodes=top_episodes,
+        all_episodes=all_episodes,
         total=total,
-        total_pages=total_pages,
-        page_views=page_views,
+        serial_total_views=serial_total_views,
+        top_serial_ids=top_serial_ids,
         format_date=format_date,
     )
 

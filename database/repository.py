@@ -145,6 +145,40 @@ async def get_total_episode_views() -> int:
     return int(docs[0]["total"]) if docs else 0
 
 
+async def get_top_viewed_episodes(
+    limit: int = 10, serial_slug: str | None = None
+) -> list[dict[str, Any]]:
+    db = get_db()
+    query: dict[str, Any] = {}
+    if serial_slug:
+        query["serial_slug"] = serial_slug
+    cursor = (
+        db.episodes.find(query)
+        .sort([("view_count", -1), ("date", -1), ("_id", -1)])
+        .limit(limit)
+    )
+    return await cursor.to_list(length=limit)
+
+
+async def get_all_episodes_for_serial(serial_slug: str) -> list[dict[str, Any]]:
+    cursor = (
+        get_db()
+        .episodes.find({"serial_slug": serial_slug})
+        .sort([("date", -1), ("_id", -1)])
+    )
+    return await cursor.to_list(length=5000)
+
+
+async def get_serial_episode_view_total(serial_slug: str) -> int:
+    db = get_db()
+    pipeline = [
+        {"$match": {"serial_slug": serial_slug}},
+        {"$group": {"_id": None, "total": {"$sum": {"$ifNull": ["$view_count", 0]}}}},
+    ]
+    docs = await db.episodes.aggregate(pipeline).to_list(length=1)
+    return int(docs[0]["total"]) if docs else 0
+
+
 async def get_episode_watchers(
     episode_id: str, limit: int = 25
 ) -> list[dict[str, Any]]:

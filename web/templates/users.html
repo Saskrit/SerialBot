@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Users — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/users.css">{% endblock %}
 {% block content %}
+<div class="page page-users">
 <div class="page-header">
   <div>
     <h1>Users</h1>
@@ -51,4 +53,5 @@
   {% if page + 1 < total_pages %}<a href="/admin/users?page={{ page + 1 }}">Next →</a>{% endif %}
 </div>
 {% endif %}
+</div>
 {% endblock %}

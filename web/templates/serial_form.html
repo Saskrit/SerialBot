@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Edit' if mode == 'edit' else 'Add' }} serial — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/serial-form.css">{% endblock %}
 {% block content %}
+<div class="page page-serial-form">
 <p><a href="/admin/serials">← Back to serials</a></p>
 
 <div class="page-header">
@@ -35,5 +37,6 @@
       <a href="/admin/serials" class="btn">Cancel</a>
     </div>
   </form>
+</div>
 </div>
 {% endblock %}

@@ -1,0 +1,32 @@
+/* Episodes management — scoped */
+
+.page-episodes {
+  max-width: 1200px;
+}
+
+.page-episodes .info-box {
+  background: var(--cream-100);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  padding: 0.9rem 1.05rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  margin-bottom: 1.35rem;
+  border-left: 4px solid var(--brand);
+}
+
+.page-episodes .search-form select {
+  min-width: 220px;
+}
+
+.page-episodes .card h2.card-title {
+  color: var(--brand);
+}
+
+.page-episodes .table-wrap tbody tr:hover td {
+  background: var(--cream-50);
+}
+
+.page-episodes td strong {
+  font-weight: 700;
+}

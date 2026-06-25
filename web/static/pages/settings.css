@@ -1,0 +1,36 @@
+/* Settings — scoped */
+
+.page-settings {
+  max-width: 760px;
+}
+
+.page-settings .settings-group {
+  margin-bottom: 1.5rem;
+}
+
+.page-settings .settings-group h2 {
+  border-bottom: 2px solid var(--cream-200);
+  padding-bottom: 0.55rem;
+  color: var(--brand);
+}
+
+.page-settings .settings-group > p strong {
+  color: var(--text);
+}
+
+.page-settings .preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.page-settings .preset-grid .btn.active {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.page-settings .form-grid input[type="text"] {
+  min-width: 200px;
+}
