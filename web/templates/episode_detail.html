@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Episode stats — {{ format_date(episode.date) }}{% endblock %}
+{% block content %}
+<p>
+  <a href="/admin/episodes/stats?slug={{ slug }}&page={{ page }}">← Back to stats</a>
+  · <a href="/admin/episodes?slug={{ slug }}">Manage episodes</a>
+</p>
+
+<div class="page-header">
+  <div>
+    <h1>{{ episode.serial_name }}</h1>
+    <p class="subtitle">{{ format_date(episode.date) }}</p>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ views }}</div>
+    <div class="stat-label">Total views</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ watchers|length }}</div>
+    <div class="stat-label">Unique watchers</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Episode info</h2>
+  <dl class="detail-list">
+    <dt>Serial</dt><dd>{{ episode.serial_name }} (<code>{{ episode.serial_slug }}</code>)</dd>
+    <dt>Date</dt><dd>{{ format_date(episode.date) }}</dd>
+    <dt>Episode ID</dt><dd><code>{{ episode_id }}</code></dd>
+  </dl>
+  <div class="table-actions" style="margin-top:1rem">
+    <a href="/admin/episodes/delete/{{ episode_id }}?slug={{ slug }}&page={{ page }}" class="btn btn-sm btn-danger">Delete episode</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Watchers</h2>
+  {% if watchers %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Telegram ID</th>
+          <th>Times watched</th>
+          <th>Last watched</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in watchers %}
+        <tr>
+          <td>
+            {{ w.first_name or 'Unknown' }}
+            {% if w.username %}<span class="muted">@{{ w.username }}</span>{% endif %}
+          </td>
+          <td><code>{{ w.telegram_id }}</code></td>
+          <td>{{ w.watch_count }}</td>
+          <td>{% if w.watched_at %}{{ format_datetime(w.watched_at) }}{% else %}—{% endif %}</td>
+          <td><a href="/admin/users/{{ w.telegram_id }}" class="btn btn-sm">Profile</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No watchers recorded yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

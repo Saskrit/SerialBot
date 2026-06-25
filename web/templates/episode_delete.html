@@ -2,16 +2,25 @@
 {% block title %}Delete episode — Serial Hub Admin{% endblock %}
 {% block content %}
 <p><a href="/admin/episodes?slug={{ slug }}&page={{ page }}">← Back to episodes</a></p>
-<h1>Delete episode?</h1>
-<div class="card">
-  <p><strong>Serial:</strong> {{ episode.serial_name }}</p>
-  <p><strong>Date:</strong> {{ format_date(episode.date) }}</p>
-  <p><strong>ID:</strong> <code>{{ episode_id }}</code></p>
+
+<div class="page-header">
+  <h1>Delete episode?</h1>
 </div>
-<form method="post" action="/admin/episodes/delete/{{ episode_id }}">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <input type="hidden" name="slug" value="{{ slug }}">
-  <button type="submit" class="btn btn-danger">Confirm delete</button>
-  <a href="/admin/episodes?slug={{ slug }}&page={{ page }}" class="btn">Cancel</a>
-</form>
+
+<div class="warning-box">This permanently removes the episode from the database and clears related user unlocks.</div>
+
+<div class="card">
+  <dl class="detail-list">
+    <dt>Serial</dt><dd>{{ episode.serial_name }}</dd>
+    <dt>Date</dt><dd>{{ format_date(episode.date) }}</dd>
+    <dt>Views</dt><dd>{{ episode.view_count or 0 }}</dd>
+    <dt>ID</dt><dd><code>{{ episode_id }}</code></dd>
+  </dl>
+  <form method="post" action="/admin/episodes/delete/{{ episode_id }}" class="actions-row" style="margin-top:1.25rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="slug" value="{{ slug }}">
+    <button type="submit" class="btn btn-danger">Confirm delete</button>
+    <a href="/admin/episodes?slug={{ slug }}&page={{ page }}" class="btn">Cancel</a>
+  </form>
+</div>
 {% endblock %}

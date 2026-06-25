@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Settings — Serial Hub Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Settings</h1>
+    <p class="subtitle">Bot-wide limits and trial behavior for free users.</p>
+  </div>
+</div>
+
+<div class="settings-group card">
+  <h2>Free tier daily limit</h2>
+  <p class="muted">How many episodes free users can watch per day. Set to 0 for unlimited free access.</p>
+  <p><strong>Current:</strong> {{ free_limit_label }}</p>
+  <form method="post" action="/admin/settings/free-limit" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>
+      Episodes per day
+      <input type="number" name="limit" value="{{ free_limit }}" min="0" max="99">
+    </label>
+    <button type="submit" class="btn btn-primary">Save limit</button>
+  </form>
+  <div class="preset-grid">
+    {% for value in free_limit_presets %}
+    <form method="post" action="/admin/settings/free-limit" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="limit" value="{{ value }}">
+      <button type="submit" class="btn btn-sm {% if value == free_limit %}active{% endif %}">
+        {% if value == 0 %}Unlimited{% else %}{{ value }}/day{% endif %}
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="settings-group card">
+  <h2>Trial episode timer</h2>
+  <p class="muted">Free users get a trial watch. After the timer, the video is removed from chat and cannot be rewatched.</p>
+  <p><strong>Current:</strong> {{ trial_ttl_label }}</p>
+  <form method="post" action="/admin/settings/trial" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>
+      Custom duration
+      <input type="text" name="duration" placeholder="off, 10s, 1min, 2hr">
+    </label>
+    <button type="submit" class="btn btn-primary">Apply</button>
+  </form>
+  <div class="preset-grid">
+    {% for seconds, label in trial_presets %}
+    <form method="post" action="/admin/settings/trial" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="seconds" value="{{ seconds }}">
+      <button type="submit" class="btn btn-sm {% if seconds == trial_ttl %}active{% endif %}">{{ label }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

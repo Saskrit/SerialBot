@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Support — Serial Hub Admin{% endblock %}
 {% block content %}
-<h1>Open support tickets</h1>
+<div class="page-header">
+  <div>
+    <h1>Support tickets</h1>
+    <p class="subtitle">Reply to users — sending a reply closes the ticket.</p>
+  </div>
+</div>
 {% if not tickets %}
 <p class="muted">No open tickets.</p>
 {% else %}

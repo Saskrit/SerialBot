@@ -1,10 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Episode requests — Serial Hub Admin{% endblock %}
 {% block content %}
-<h1>Open episode requests</h1>
+<div class="page-header">
+  <div>
+    <h1>Episode requests</h1>
+    <p class="subtitle">User-submitted requests for missing episodes.</p>
+  </div>
+</div>
 {% if not requests %}
 <p class="muted">No open requests.</p>
 {% else %}
+<div class="table-wrap">
 <table>
   <thead>
     <tr><th>Serial</th><th>Date</th><th>User</th><th>Submitted</th><th></th></tr>
@@ -26,5 +32,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}

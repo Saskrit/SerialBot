@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Broadcast — Serial Hub Admin{% endblock %}
 {% block content %}
-<h1>Broadcast message</h1>
-<p class="muted">Sends a plain-text message to all non-banned users via the Telegram bot.</p>
+<div class="page-header">
+  <div>
+    <h1>Broadcast message</h1>
+    <p class="subtitle">Sends a plain-text message to all non-banned users via the Telegram bot.</p>
+  </div>
+</div>
 <form method="post" action="/admin/broadcast" class="card broadcast-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label>

@@ -10,15 +10,27 @@
   {% if admin_id %}
   <div class="layout">
     <aside class="sidebar">
-      <div class="brand">Serial Hub</div>
+      <div class="brand">Serial Hub Admin</div>
       <nav>
+        <div class="nav-section">Overview</div>
         <a href="/admin/" class="{% if path == '/admin/' %}active{% endif %}">Dashboard</a>
+
+        <div class="nav-section">Content</div>
+        <a href="/admin/serials" class="{% if path.startswith('/admin/serials') %}active{% endif %}">Serials</a>
+        <a href="/admin/episodes" class="{% if path == '/admin/episodes' or path.startswith('/admin/episodes/delete') %}active{% endif %}">Episodes</a>
+        <a href="/admin/episodes/stats" class="{% if path.startswith('/admin/episodes/stats') or path.startswith('/admin/episodes/view/') %}active{% endif %}">Episode stats</a>
+
+        <div class="nav-section">Users &amp; billing</div>
         <a href="/admin/users" class="{% if path.startswith('/admin/users') %}active{% endif %}">Users</a>
         <a href="/admin/payments" class="{% if path.startswith('/admin/payments') %}active{% endif %}">Payments</a>
-        <a href="/admin/episodes" class="{% if path.startswith('/admin/episodes') %}active{% endif %}">Episodes</a>
-        <a href="/admin/requests" class="{% if path.startswith('/admin/requests') %}active{% endif %}">Requests</a>
-        <a href="/admin/support" class="{% if path.startswith('/admin/support') %}active{% endif %}">Support</a>
+
+        <div class="nav-section">Support</div>
+        <a href="/admin/requests" class="{% if path.startswith('/admin/requests') %}active{% endif %}">Episode requests</a>
+        <a href="/admin/support" class="{% if path.startswith('/admin/support') %}active{% endif %}">Support tickets</a>
         <a href="/admin/broadcast" class="{% if path.startswith('/admin/broadcast') %}active{% endif %}">Broadcast</a>
+
+        <div class="nav-section">Configuration</div>
+        <a href="/admin/settings" class="{% if path.startswith('/admin/settings') %}active{% endif %}">Settings</a>
       </nav>
       <form action="/admin/logout" method="post" class="logout-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

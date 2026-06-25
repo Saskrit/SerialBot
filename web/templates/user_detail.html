@@ -2,40 +2,71 @@
 {% block title %}User {{ user.telegram_id }} — Serial Hub Admin{% endblock %}
 {% block content %}
 <p><a href="/admin/users">← Back to users</a></p>
-<h1>User {{ user.telegram_id }}</h1>
+
+<div class="page-header">
+  <div>
+    <h1>{{ user.first_name or 'User' }} <span class="muted" style="font-weight:400;font-size:1rem"><code>{{ user.telegram_id }}</code></span></h1>
+    <p class="subtitle">
+      {% if user.plan == 'vip' %}<span class="badge badge-vip">VIP</span>{% else %}Free plan{% endif %}
+      {% if user.banned %} · <span class="badge badge-danger">Banned</span>{% endif %}
+    </p>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <h2 class="card-title">Profile</h2>
+    <dl class="detail-list">
+      <dt>Name</dt><dd>{{ user.first_name or '—' }}</dd>
+      <dt>Username</dt><dd>{% if user.username %}@{{ user.username }}{% else %}—{% endif %}</dd>
+      <dt>Plan</dt><dd>{{ user.plan }}</dd>
+      <dt>VIP expires</dt><dd>{% if user.vip_expires %}{{ format_date(user.vip_expires) }}{% else %}—{% endif %}</dd>
+      <dt>Daily watches</dt><dd>{{ user.daily_watches }}{% if user.plan != 'vip' %} / {{ free_limit if free_limit > 0 else '∞' }}{% endif %}</dd>
+      <dt>Unlocked episodes</dt><dd>{{ user.unlocked_episodes|length if user.unlocked_episodes else 0 }}</dd>
+      <dt>Banned</dt><dd>{{ 'Yes' if user.banned else 'No' }}</dd>
+      <dt>Registered</dt><dd>{% if user.registered_at %}{{ format_datetime(user.registered_at) }}{% else %}—{% endif %}</dd>
+      <dt>Last active</dt><dd>{% if user.last_active %}{{ format_datetime(user.last_active) }}{% else %}—{% endif %}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title">Actions</h2>
+    <form method="post" action="/admin/users/{{ user.telegram_id }}/vip" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Grant VIP (days) <input type="number" name="days" value="30" min="1" max="365"></label>
+      <button type="submit" class="btn btn-primary">Grant VIP</button>
+    </form>
+
+    <form method="post" action="/admin/users/{{ user.telegram_id }}/unlock" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Unlock episode <input type="text" name="episode_id" placeholder="Episode ObjectId" required></label>
+      <button type="submit" class="btn">Grant unlock</button>
+    </form>
+
+    <div class="actions-row">
+      {% if user.banned %}
+      <form method="post" action="/admin/users/{{ user.telegram_id }}/unban">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn">Unban user</button>
+      </form>
+      {% else %}
+      <form method="post" action="/admin/users/{{ user.telegram_id }}/ban">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-danger">Ban user</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/admin/users/{{ user.telegram_id }}/delete" onsubmit="return confirm('Delete this user permanently?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-danger">Delete user</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if user.unlocked_episodes %}
 <div class="card">
-  <dl class="detail-list">
-    <dt>Name</dt><dd>{{ user.first_name or '—' }}</dd>
-    <dt>Username</dt><dd>{% if user.username %}@{{ user.username }}{% else %}—{% endif %}</dd>
-    <dt>Plan</dt><dd>{{ user.plan }}</dd>
-    <dt>VIP expires</dt><dd>{% if user.vip_expires %}{{ format_date(user.vip_expires) }}{% else %}—{% endif %}</dd>
-    <dt>Daily watches</dt><dd>{{ user.daily_watches }}</dd>
-    <dt>Unlocks</dt><dd>{{ user.unlocked_episodes|length if user.unlocked_episodes else 0 }}</dd>
-    <dt>Banned</dt><dd>{{ 'Yes' if user.banned else 'No' }}</dd>
-    <dt>Registered</dt><dd>{% if user.registered_at %}{{ format_datetime(user.registered_at) }}{% else %}—{% endif %}</dd>
-    <dt>Last active</dt><dd>{% if user.last_active %}{{ format_datetime(user.last_active) }}{% else %}—{% endif %}</dd>
-  </dl>
+  <h2 class="card-title">Unlocked episode IDs</h2>
+  <p class="muted">{% for ep_id in user.unlocked_episodes %}<code>{{ ep_id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
 </div>
-<div class="actions-row">
-  <form method="post" action="/admin/users/{{ user.telegram_id }}/vip">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Grant VIP (days) <input type="number" name="days" value="30" min="1" max="365"></label>
-    <button type="submit" class="btn btn-primary">Grant VIP</button>
-  </form>
-  {% if user.banned %}
-  <form method="post" action="/admin/users/{{ user.telegram_id }}/unban">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit" class="btn">Unban</button>
-  </form>
-  {% else %}
-  <form method="post" action="/admin/users/{{ user.telegram_id }}/ban">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit" class="btn btn-danger">Ban</button>
-  </form>
-  {% endif %}
-  <form method="post" action="/admin/users/{{ user.telegram_id }}/delete" onsubmit="return confirm('Delete this user permanently?');">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit" class="btn btn-danger">Delete user</button>
-  </form>
-</div>
+{% endif %}
 {% endblock %}

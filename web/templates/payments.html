@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Payments — Serial Hub Admin{% endblock %}
 {% block content %}
-<h1>Pending payments</h1>
+<div class="page-header">
+  <div>
+    <h1>Pending payments</h1>
+    <p class="subtitle">Review screenshots and approve or reject VIP and episode unlock payments.</p>
+  </div>
+</div>
 {% if not payments %}
 <p class="muted">No pending payments with screenshots.</p>
 {% else %}

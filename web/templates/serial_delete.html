@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ serial.name }} — Serial Hub Admin{% endblock %}
+{% block content %}
+<p><a href="/admin/serials">← Back to serials</a></p>
+
+<div class="page-header">
+  <h1>Delete serial</h1>
+</div>
+
+<div class="warning-box">
+  <strong>This cannot be undone.</strong>
+  Deleting <strong>{{ serial.name }}</strong> (<code>{{ serial.slug }}</code>) will remove
+  <strong>{{ episode_count }}</strong> episode(s) from the database and clear related user unlocks.
+  The serial will not reappear from seed data.
+</div>
+
+<div class="card">
+  <dl class="detail-list">
+    <dt>Name</dt><dd>{{ serial.name }}</dd>
+    <dt>Slug</dt><dd><code>{{ serial.slug }}</code></dd>
+    <dt>Episodes</dt><dd>{{ episode_count }}</dd>
+  </dl>
+  <form method="post" action="/admin/serials/{{ serial.slug }}/delete" class="actions-row" style="margin-top:1.25rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn btn-danger">Yes, delete serial and episodes</button>
+    <a href="/admin/serials" class="btn">Cancel</a>
+  </form>
+</div>
+{% endblock %}

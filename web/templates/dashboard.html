@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Serial Hub Admin{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
+<div class="page-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="subtitle">Overview of your bot at a glance.</p>
+  </div>
+</div>
+
 <div class="stats-grid">
   <div class="stat-card">
     <div class="stat-value">{{ stats.total }}</div>
@@ -20,8 +26,16 @@
     <div class="stat-label">Banned</div>
   </div>
   <div class="stat-card">
+    <div class="stat-value">{{ serial_count }}</div>
+    <div class="stat-label">Active serials</div>
+  </div>
+  <div class="stat-card">
     <div class="stat-value">{{ episode_count }}</div>
     <div class="stat-label">Episodes</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ total_views }}</div>
+    <div class="stat-label">Total views</div>
   </div>
   <div class="stat-card highlight">
     <div class="stat-value">{{ pending }}</div>
@@ -36,5 +50,29 @@
     <div class="stat-label">Open tickets</div>
   </div>
 </div>
-<p class="muted">Logged in as admin <code>{{ admin_id }}</code>. Episode uploads stay in Telegram via the storage channel.</p>
+
+<div class="two-col">
+  <div class="card">
+    <h2 class="card-title">Current settings</h2>
+    <dl class="detail-list">
+      <dt>Free tier limit</dt>
+      <dd>{{ free_limit_label }}</dd>
+      <dt>Trial episode timer</dt>
+      <dd>{{ trial_ttl_label }}</dd>
+    </dl>
+    <p style="margin-top:1rem"><a href="/admin/settings" class="btn btn-sm">Edit settings</a></p>
+  </div>
+  <div class="card">
+    <h2 class="card-title">Quick links</h2>
+    <div class="table-actions">
+      <a href="/admin/serials/new" class="btn btn-sm btn-primary">Add serial</a>
+      <a href="/admin/episodes" class="btn btn-sm">Manage episodes</a>
+      <a href="/admin/payments" class="btn btn-sm">Review payments</a>
+      <a href="/admin/broadcast" class="btn btn-sm">Send broadcast</a>
+    </div>
+    <p class="muted" style="margin-top:1rem">Episode video uploads stay in Telegram via the storage channel.</p>
+  </div>
+</div>
+
+<p class="muted">Logged in as admin <code>{{ admin_id }}</code>.</p>
 {% endblock %}

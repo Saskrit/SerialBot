@@ -2,42 +2,48 @@
 {% block title %}Users — Serial Hub Admin{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1>Users</h1>
-  <form class="search-form" method="get" action="/admin/users">
+  <div>
+    <h1>Users</h1>
+    <p class="subtitle">{{ total }} user(s) total</p>
+  </div>
+  <form class="search-form" method="get" action="/admin/users" style="margin:0">
     <input type="text" name="q" value="{{ search }}" placeholder="Search by Telegram ID">
     <button type="submit" class="btn">Search</button>
   </form>
 </div>
-<p class="muted">{{ total }} user(s) total</p>
-<table>
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Telegram ID</th>
-      <th>Plan</th>
-      <th>Usage</th>
-      <th>Status</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for user in users %}
-    <tr>
-      <td>
-        {{ user.first_name or 'Unknown' }}
-        {% if user.username %}<span class="muted">@{{ user.username }}</span>{% endif %}
-      </td>
-      <td><code>{{ user.telegram_id }}</code></td>
-      <td>{{ 'VIP' if user.plan == 'vip' else 'Free' }}</td>
-      <td>{% if user.plan == 'vip' %}∞{% else %}{{ user.daily_watches }}/3 today{% endif %}</td>
-      <td>{% if user.banned %}<span class="badge badge-danger">Banned</span>{% else %}<span class="badge badge-ok">Active</span>{% endif %}</td>
-      <td><a href="/admin/users/{{ user.telegram_id }}">Manage</a></td>
-    </tr>
-    {% else %}
-    <tr><td colspan="6" class="muted">No users found.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Telegram ID</th>
+        <th>Plan</th>
+        <th>Usage</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>
+          {{ user.first_name or 'Unknown' }}
+          {% if user.username %}<span class="muted">@{{ user.username }}</span>{% endif %}
+        </td>
+        <td><code>{{ user.telegram_id }}</code></td>
+        <td>{% if user.plan == 'vip' %}<span class="badge badge-vip">VIP</span>{% else %}Free{% endif %}</td>
+        <td>{% if user.plan == 'vip' %}∞{% else %}{{ user.daily_watches }}/{{ free_limit if free_limit > 0 else '∞' }} today{% endif %}</td>
+        <td>{% if user.banned %}<span class="badge badge-danger">Banned</span>{% else %}<span class="badge badge-ok">Active</span>{% endif %}</td>
+        <td><a href="/admin/users/{{ user.telegram_id }}" class="btn btn-sm">Manage</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No users found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 {% if total_pages > 1 and not search %}
 <div class="pagination">
   {% if page > 0 %}<a href="/admin/users?page={{ page - 1 }}">← Prev</a>{% endif %}

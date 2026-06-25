@@ -704,6 +704,39 @@ async def create_serial(
     return doc, ""
 
 
+async def update_serial(
+    slug: str, name: str, aliases: list[str] | None = None
+) -> tuple[dict[str, Any] | None, str]:
+    db = get_db()
+    serial = await db.serials.find_one({"slug": slug, "active": True})
+    if not serial:
+        return None, "Serial not found."
+
+    clean_name = name.strip()
+    if not clean_name:
+        return None, "Serial name cannot be empty."
+
+    clean_aliases = list(
+        dict.fromkeys(alias.strip() for alias in (aliases or []) if alias.strip())
+    )
+    await db.serials.update_one(
+        {"slug": slug},
+        {"$set": {"name": clean_name, "aliases": clean_aliases}},
+    )
+    if clean_name != serial.get("name"):
+        await db.episodes.update_many(
+            {"serial_slug": slug},
+            {"$set": {"serial_name": clean_name}},
+        )
+
+    updated = await db.serials.find_one({"slug": slug})
+    return updated, ""
+
+
+async def count_active_serials() -> int:
+    return await get_db().serials.count_documents({"active": True})
+
+
 async def list_serials_admin(
     page: int, per_page: int
 ) -> tuple[list[dict[str, Any]], int]:

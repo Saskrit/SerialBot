@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Serials — Serial Hub Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Serials</h1>
+    <p class="subtitle">{{ total }} active serial(s) in the catalog.</p>
+  </div>
+  <a href="/admin/serials/new" class="btn btn-primary">Add serial</a>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Slug</th>
+        <th>Aliases</th>
+        <th>Episodes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for serial in serials %}
+      <tr>
+        <td><strong>{{ serial.name }}</strong></td>
+        <td><code>{{ serial.slug }}</code></td>
+        <td class="muted">{% if serial.aliases %}{{ serial.aliases | join(', ') }}{% else %}—{% endif %}</td>
+        <td>{{ serial.episode_count }}</td>
+        <td>
+          <div class="table-actions">
+            <a href="/admin/episodes?slug={{ serial.slug }}" class="btn btn-sm">Episodes</a>
+            <a href="/admin/serials/{{ serial.slug }}/edit" class="btn btn-sm">Edit</a>
+            <a href="/admin/serials/{{ serial.slug }}/delete" class="btn btn-sm btn-danger">Delete</a>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No serials yet. Add one to get started.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 0 %}<a href="/admin/serials?page={{ page - 1 }}">← Prev</a>{% endif %}
+  <span>Page {{ page + 1 }} / {{ total_pages }}</span>
+  {% if page + 1 < total_pages %}<a href="/admin/serials?page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
