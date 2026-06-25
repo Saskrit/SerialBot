@@ -3,6 +3,7 @@ from datetime import datetime
 from config import EPISODES_PER_PAGE, TZ, SERIALS_PER_PAGE
 from database import repository as repo
 from database.datetime_utils import ensure_aware
+from services.date_query import UserDateQuery, format_user_date_label
 from services.payment_contact import payment_contact_label
 from services.settings import format_free_limit_label, get_free_daily_limit, is_free_unlimited
 
