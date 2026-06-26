@@ -2,6 +2,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardBu
 
 from config import EPISODES_PER_PAGE, PAYMENT_CONTACT_USERNAME, SERIALS_PER_PAGE
 from database import repository as repo
+from services.membership import UPGRADE_PLANS, get_plan, plan_button_text
 from services.messages import DATE_EPISODES_PER_PAGE, format_date, format_month_year
 
 CLOSE_CALLBACK = "ui:close"
@@ -35,7 +36,7 @@ def main_menu_keyboard(user: dict | None = None) -> ReplyKeyboardMarkup:
                 KeyboardButton(text="📚 Browse Serials"),
             ],
             [
-                KeyboardButton(text="📋 My Plan"),
+                KeyboardButton(text="📋 My Membership"),
                 KeyboardButton(text=plan_button),
             ],
             [
@@ -252,22 +253,55 @@ async def date_episodes_keyboard(
 
 
 def limit_reached_keyboard(episode_id: str) -> InlineKeyboardMarkup:
-    _ = episode_id
-    contact = f"@{PAYMENT_CONTACT_USERNAME}"
-    rows = [
-        [
-            InlineKeyboardButton(
-                text=f"💬 Contact {contact} for Payment",
-                url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
+    return upgrade_plans_keyboard(episode_id)
+
+
+def upgrade_plans_keyboard(episode_id: str | None = None) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for plan in UPGRADE_PLANS:
+        if plan.id == "free_tomorrow":
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=plan_button_text(plan),
+                        callback_data="upgrade:free_tomorrow",
+                    )
+                ]
             )
-        ],
-        [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
-    ]
+            continue
+        if plan.id == "episode_pass" and episode_id:
+            callback = f"pay:plan:episode_pass:{episode_id}"
+        elif plan.id == "episode_pass":
+            callback = "pay:plan:episode_pass"
+        else:
+            callback = f"pay:plan:{plan.id}"
+        rows.append(
+            [InlineKeyboardButton(text=plan_button_text(plan), callback_data=callback)]
+        )
+    rows.append([InlineKeyboardButton(text="📋 My Membership", callback_data="plan")])
     append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def payment_contact_keyboard() -> InlineKeyboardMarkup:
+def membership_catalog_keyboard() -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for plan in UPGRADE_PLANS:
+        if plan.id == "free_tomorrow":
+            continue
+        if plan.id == "episode_pass":
+            callback = "pay:plan:episode_pass"
+        else:
+            callback = f"pay:plan:{plan.id}"
+        rows.append(
+            [InlineKeyboardButton(text=plan_button_text(plan), callback_data=callback)]
+        )
+    rows.append([InlineKeyboardButton(text="📋 My Membership", callback_data="plan")])
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def payment_contact_keyboard(*, plan_id: str | None = None) -> InlineKeyboardMarkup:
+    _ = plan_id
     contact = f"@{PAYMENT_CONTACT_USERNAME}"
     rows = [
         [
@@ -282,42 +316,31 @@ def payment_contact_keyboard() -> InlineKeyboardMarkup:
 
 
 def vip_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
-    contact = f"@{PAYMENT_CONTACT_USERNAME}"
     if user and user.get("plan") == "vip":
         rows = [
             [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
-            [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
+            [InlineKeyboardButton(text="📋 My Membership", callback_data="plan")],
         ]
     else:
         rows = [
-            [
-                InlineKeyboardButton(
-                    text=f"💬 Contact {contact} for Membership",
-                    url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
-                )
-            ],
-            [InlineKeyboardButton(text="📋 My Plan", callback_data="plan")],
+            [InlineKeyboardButton(text="⭐ View All Plans", callback_data="membership:catalog")],
+            [InlineKeyboardButton(text="📋 My Membership", callback_data="plan")],
         ]
     append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def plan_keyboard(user: dict | None = None) -> InlineKeyboardMarkup | None:
-    contact = f"@{PAYMENT_CONTACT_USERNAME}"
+def plan_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
     if user and user.get("plan") == "vip":
-        rows = [
-            [InlineKeyboardButton(text="✅ You are a VIP Member", callback_data="vip:status")],
-        ]
+        rows.append(
+            [InlineKeyboardButton(text="✅ VIP Status", callback_data="vip:status")]
+        )
     else:
-        rows = [
-            [
-                InlineKeyboardButton(
-                    text=f"💬 Contact {contact} for Payment",
-                    url=f"https://t.me/{PAYMENT_CONTACT_USERNAME}",
-                )
-            ],
-            [InlineKeyboardButton(text="🎁 Refer & Watch", callback_data="refer")],
-        ]
+        rows.append(
+            [InlineKeyboardButton(text="⭐ Upgrade / Renew", callback_data="membership:catalog")]
+        )
+    rows.append([InlineKeyboardButton(text="🎁 Refer & Watch", callback_data="refer")])
     append_ui_actions(rows)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -409,6 +432,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
         [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
+        [InlineKeyboardButton(text="🎁 Referrals", callback_data="admin:referrals:0")],
         [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
         [InlineKeyboardButton(text="⚙️ Free Tier Limit", callback_data="admin:freelimit")],
         [InlineKeyboardButton(text="⏳ Trial Episode Timer", callback_data="admin:trial")],
@@ -491,6 +515,28 @@ def admin_users_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
     if page < total_pages - 1:
         nav.append(
             InlineKeyboardButton(text="Next ▶", callback_data=f"admin:users:{page + 1}")
+        )
+    if nav:
+        rows.append(nav)
+    rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
+    append_ui_actions(rows, include_home=False)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def admin_referrals_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(
+                text="◀ Prev", callback_data=f"admin:referrals:{page - 1}"
+            )
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="Next ▶", callback_data=f"admin:referrals:{page + 1}"
+            )
         )
     if nav:
         rows.append(nav)

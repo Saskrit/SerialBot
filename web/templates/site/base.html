@@ -17,7 +17,7 @@
         <a href="/" class="{% if path == '/' %}active{% endif %}">{{ icon('home', 16) }} Home</a>
         <a href="/serials" class="{% if path.startswith('/serials') %}active{% endif %}">{{ icon('grid', 16) }} Browse</a>
         <a href="/search" class="{% if path.startswith('/search') %}active{% endif %}">{{ icon('search', 16) }} Search</a>
-        <a href="/plan" class="{% if path == '/plan' %}active{% endif %}">{{ icon('crown', 16) }} VIP Plan</a>
+        <a href="/plan" class="{% if path == '/plan' %}active{% endif %}">{{ icon('crown', 16) }} Membership</a>
         {% if bot_url %}
         <a href="{{ bot_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">{{ icon('send', 16) }} Telegram</a>
         {% endif %}

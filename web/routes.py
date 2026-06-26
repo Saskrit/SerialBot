@@ -127,6 +127,7 @@ async def dashboard(request: web.Request) -> web.Response:
     )
     open_requests = await get_db().episode_requests.count_documents({"status": "open"})
     open_tickets = await get_db().support_tickets.count_documents({"status": "open"})
+    referral_count = await repo.count_referrals()
     return _html(
         "dashboard.html",
         request,
@@ -135,6 +136,7 @@ async def dashboard(request: web.Request) -> web.Response:
         episode_count=episode_count,
         serial_count=serial_count,
         total_views=total_views,
+        referral_count=referral_count,
         free_limit_label=format_free_limit_label(free_limit),
         trial_ttl_label=format_trial_ttl_label(trial_ttl),
         pending=pending,
@@ -155,9 +157,20 @@ async def users_list(request: web.Request) -> web.Response:
         total = len(users)
         total_pages = 1
         page = 0
+        referrers: dict[int, dict] = {}
+        if user and user.get("referred_by"):
+            ref = await repo.get_user(user["referred_by"])
+            if ref:
+                referrers[ref["telegram_id"]] = ref
     else:
         users, total = await repo.list_users(page, USERS_PER_PAGE)
         total_pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+
+    referrers: dict[int, dict] = {}
+    referrer_ids = list({u["referred_by"] for u in users if u.get("referred_by")})
+    if referrer_ids:
+        async for doc in get_db().users.find({"telegram_id": {"$in": referrer_ids}}):
+            referrers[doc["telegram_id"]] = doc
 
     free_limit = await get_free_daily_limit()
     return _html(
@@ -165,6 +178,7 @@ async def users_list(request: web.Request) -> web.Response:
         request,
         flash=_flash_from_query(request),
         users=users,
+        referrers=referrers,
         page=page,
         total_pages=total_pages,
         total=total,
@@ -181,12 +195,39 @@ async def user_detail(request: web.Request) -> web.Response:
     if not user:
         raise web.HTTPFound("/admin/users?msg=User+not+found")
     free_limit = await get_free_daily_limit()
+    referrer = None
+    if user.get("referred_by"):
+        referrer = await repo.get_user(user["referred_by"])
+    referred_users = await repo.list_referred_users(telegram_id)
     return _html(
         "user_detail.html",
         request,
         flash=_flash_from_query(request),
         user=user,
+        referrer=referrer,
+        referred_users=referred_users,
         free_limit=free_limit,
+        format_date=format_date,
+        format_datetime=format_datetime,
+    )
+
+
+REFERRALS_PER_PAGE = 25
+
+
+@require_admin
+async def referrals_list(request: web.Request) -> web.Response:
+    page = max(0, int(request.rel_url.query.get("page", "0")))
+    pairs, total = await repo.list_referral_pairs(page, REFERRALS_PER_PAGE)
+    total_pages = max(1, (total + REFERRALS_PER_PAGE - 1) // REFERRALS_PER_PAGE)
+    return _html(
+        "referrals.html",
+        request,
+        flash=_flash_from_query(request),
+        pairs=pairs,
+        page=page,
+        total=total,
+        total_pages=total_pages,
         format_date=format_date,
         format_datetime=format_datetime,
     )
@@ -784,6 +825,7 @@ def setup_admin_routes(app: web.Application, create_bot) -> None:
     app.router.add_get("/admin/", dashboard)
     app.router.add_get("/admin/users", users_list)
     app.router.add_get("/admin/users/{telegram_id:\\d+}", user_detail)
+    app.router.add_get("/admin/referrals", referrals_list)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/ban", user_ban)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/unban", user_unban)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/vip", user_grant_vip)

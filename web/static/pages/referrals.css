@@ -1,0 +1,17 @@
+/* Referrals admin page */
+
+.page-referrals .invite-arrow {
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+  width: 2rem;
+}
+
+.page-referrals td code {
+  margin-left: 0.35rem;
+  font-size: 0.85em;
+}
+
+.page-referrals td .btn-sm {
+  margin-left: 0.5rem;
+}

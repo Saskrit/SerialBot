@@ -18,12 +18,14 @@ from keyboards.inline import (
     admin_episodes_keyboard,
     admin_free_limit_keyboard,
     admin_menu_keyboard,
+    admin_referrals_keyboard,
     admin_serials_delete_keyboard,
     admin_trial_ttl_keyboard,
     admin_user_keyboard,
     admin_users_keyboard,
 )
 from services.messages import format_date, format_datetime
+from services.referral_admin import format_invite_pair_text, user_admin_summary
 from services.episode_upload import save_episode_from_addepisode, save_episode_from_message
 from services.serial_utils import parse_add_serial_input
 from services import admin_actions
@@ -749,6 +751,7 @@ async def admin_panel(message: Message):
 
 
 USERS_PER_PAGE = 15
+REFERRALS_PER_PAGE = 8
 
 
 def _format_user_line(index: int, user: dict, *, daily_limit: int) -> str:
@@ -825,6 +828,48 @@ async def admin_users_list(callback: CallbackQuery):
     await _send_users_page(callback, page)
 
 
+async def _send_referrals_page(target: Message | CallbackQuery, page: int) -> None:
+    pairs, total = await repo.list_referral_pairs(page, REFERRALS_PER_PAGE)
+    if total == 0:
+        text = "🎁 <b>Referrals</b>\n\nNo invites recorded yet."
+        keyboard = admin_referrals_keyboard(0, 1)
+    else:
+        total_pages = max(1, (total + REFERRALS_PER_PAGE - 1) // REFERRALS_PER_PAGE)
+        page = max(0, min(page, total_pages - 1))
+        pairs, _ = await repo.list_referral_pairs(page, REFERRALS_PER_PAGE)
+        lines = [
+            f"🎁 <b>Referrals</b> · Page {page + 1}/{total_pages}",
+            f"Total invites: <b>{total}</b>\n",
+        ]
+        for i, pair in enumerate(pairs, start=page * REFERRALS_PER_PAGE + 1):
+            line = format_invite_pair_text(
+                pair.get("referrer"),
+                pair["referred"],
+                referrer_id=pair.get("referrer_id"),
+            )
+            referred_at = pair.get("referred_at")
+            if referred_at:
+                line += f"\n   <i>{format_datetime(referred_at)}</i>"
+            lines.append(f"{i}. {line}")
+        text = "\n".join(lines)
+        keyboard = admin_referrals_keyboard(page, total_pages)
+
+    if isinstance(target, CallbackQuery):
+        await target.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        await target.answer()
+    else:
+        await target.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("admin:referrals:"))
+async def admin_referrals_list(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    page = int(callback.data.split(":", 2)[2])
+    await _send_referrals_page(callback, page)
+
+
 @router.callback_query(F.data == "admin:stats")
 async def admin_stats(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
@@ -849,6 +894,7 @@ async def admin_stats(callback: CallbackQuery):
         f"Episodes: <b>{episode_count}</b>\n"
         f"Total episode views: <b>{total_views}</b>\n"
         f"Pending payments: <b>{pending}</b>\n"
+        f"Referral invites: <b>{await repo.count_referrals()}</b>\n"
         f"Free tier limit: <b>{format_free_limit_label(free_limit)}</b>\n"
         f"Trial episode timer: <b>{format_trial_ttl_label(trial_ttl)}</b>"
     )
@@ -1152,13 +1198,44 @@ async def admin_user_lookup(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    text = (
-        f"👤 <b>User {telegram_id}</b>\n"
-        f"Plan: {user.get('plan')}\n"
-        f"Daily watches: {user.get('daily_watches', 0)}\n"
-        f"Banned: {user.get('banned', False)}\n"
-        f"Unlocks: {len(user.get('unlocked_episodes', []))}"
-    )
+    referrer = None
+    if user.get("referred_by"):
+        referrer = await repo.get_user(user["referred_by"])
+    referred_users = await repo.list_referred_users(telegram_id)
+
+    display_name = user.get("first_name") or "User"
+    lines = [
+        f"👤 <b>{display_name}</b>",
+        f"ID: <code>{telegram_id}</code>",
+        f"Username: @{user['username']}" if user.get("username") else "Username: —",
+        f"Plan: {user.get('plan')}",
+        f"Daily watches: {user.get('daily_watches', 0)}",
+        f"Banned: {user.get('banned', False)}",
+        f"Unlocks: {len(user.get('unlocked_episodes', []))}",
+        f"Referrals sent: {user.get('referral_count', 0)}",
+        f"Bonus watches: {user.get('referral_watch_credits', 0)}",
+        "",
+        "🎁 <b>Referral info</b>",
+    ]
+    if referrer:
+        lines.append(
+            f"Invited by: <b>{user_admin_summary(referrer)}</b>"
+        )
+        if user.get("referred_at"):
+            lines.append(f"Invite date: {format_datetime(user['referred_at'])}")
+    else:
+        lines.append("Invited by: —")
+
+    if referred_users:
+        lines.append(f"\nInvited <b>{len(referred_users)}</b> user(s):")
+        for invited in referred_users[:10]:
+            lines.append(f"• {user_admin_summary(invited)}")
+        if len(referred_users) > 10:
+            lines.append(f"… and {len(referred_users) - 10} more")
+    else:
+        lines.append("\nHas not invited anyone yet.")
+
+    text = "\n".join(lines)
     await message.answer(
         text,
         reply_markup=admin_user_keyboard(telegram_id),

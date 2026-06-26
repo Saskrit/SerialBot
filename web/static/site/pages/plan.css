@@ -1,21 +1,66 @@
-/* Plan page */
+/* Membership plans page */
+
+.plan-section {
+  margin-bottom: 2.5rem;
+}
+
+.section-label {
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--bronze);
+}
 
 .plan-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1.25rem;
-  margin-bottom: 2rem;
+}
+
+.plan-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  max-width: 720px;
 }
 
 .plan-card {
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
-.plan-card.featured {
+.plan-card.featured,
+.plan-card.recommended {
   border: 2px solid var(--bronze);
-  background: var(--surface);
   box-shadow: var(--shadow-lg);
+}
+
+.plan-card.best-value {
+  border: 2px solid var(--navy);
+}
+
+.plan-card.max-savings {
+  border: 2px solid var(--sage);
+  background: linear-gradient(180deg, var(--surface) 0%, rgba(211, 212, 192, 0.25) 100%);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -0.65rem;
+  right: 1rem;
+  background: var(--navy);
+  color: var(--cream);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+}
+
+.plan-badge.badge-recommended {
+  background: var(--bronze);
 }
 
 .plan-tag {
@@ -30,17 +75,24 @@
   margin-bottom: 0.5rem;
 }
 
-.plan-card h2 {
+.plan-card h3 {
   margin: 0 0 0.25rem;
   font-size: 1.35rem;
   color: var(--navy);
 }
 
 .plan-price {
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
   color: var(--bronze);
+  margin: 0 0 0.35rem;
+}
+
+.plan-validity {
   margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .plan-card ul {
@@ -59,9 +111,34 @@
   align-self: flex-start;
 }
 
-.payment-note {
+.plan-free,
+.plan-refer {
+  max-width: 420px;
+}
+
+.vip-perks {
   background: var(--sage);
   border-color: rgba(10, 41, 71, 0.1);
+}
+
+.perks-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.65rem 1.5rem;
+}
+
+.perks-list li {
+  color: var(--navy);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.payment-note {
+  background: var(--surface);
+  border-left: 4px solid var(--bronze);
 }
 
 .payment-note h3 {
@@ -72,4 +149,16 @@
 .payment-note p {
   margin: 0 0 1rem;
   color: var(--text-secondary);
+}
+
+.payment-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .plan-grid {
+    grid-template-columns: 1fr;
+  }
 }

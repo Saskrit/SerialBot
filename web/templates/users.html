@@ -21,6 +21,7 @@
         <th>Name</th>
         <th>Telegram ID</th>
         <th>Plan</th>
+        <th>Invited by</th>
         <th>Usage</th>
         <th>Status</th>
         <th></th>
@@ -35,12 +36,24 @@
         </td>
         <td><code>{{ user.telegram_id }}</code></td>
         <td>{% if user.plan == 'vip' %}<span class="badge badge-vip">VIP</span>{% else %}Free{% endif %}</td>
+        <td>
+          {% if user.referred_by %}
+            {% set ref = referrers.get(user.referred_by) %}
+            {% if ref %}
+            <a href="/admin/users/{{ ref.telegram_id }}">{{ ref.first_name or 'User' }}</a>
+            {% if ref.username %}<span class="muted">@{{ ref.username }}</span>{% endif %}
+            <code>{{ ref.telegram_id }}</code>
+            {% else %}
+            <code>{{ user.referred_by }}</code>
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
         <td>{% if user.plan == 'vip' %}∞{% else %}{{ user.daily_watches }}/{{ free_limit if free_limit > 0 else '∞' }} today{% endif %}</td>
         <td>{% if user.banned %}<span class="badge badge-danger">Banned</span>{% else %}<span class="badge badge-ok">Active</span>{% endif %}</td>
         <td><a href="/admin/users/{{ user.telegram_id }}" class="btn btn-sm">Manage</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">No users found.</td></tr>
+      <tr><td colspan="7" class="muted">No users found.</td></tr>
       {% endfor %}
     </tbody>
   </table>

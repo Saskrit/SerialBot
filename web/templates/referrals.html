@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "referral_macros.html" import user_link %}
+{% block title %}Referrals — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/referrals.css">{% endblock %}
+{% block content %}
+<div class="page page-referrals">
+<div class="page-header">
+  <div>
+    <h1>Referrals</h1>
+    <p class="subtitle">{{ total }} invite(s) recorded — who invited whom</p>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Inviter</th>
+        <th></th>
+        <th>Invited user</th>
+        <th>Date</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pair in pairs %}
+      <tr>
+        <td>
+          {% if pair.referrer %}
+          {{ user_link(pair.referrer) }}
+          {% else %}
+          <span class="muted">Unknown</span> <code>{{ pair.referrer_id }}</code>
+          {% endif %}
+        </td>
+        <td class="invite-arrow">→</td>
+        <td>{{ user_link(pair.referred) }}</td>
+        <td class="muted">
+          {% if pair.referred_at %}{{ format_datetime(pair.referred_at) }}{% else %}—{% endif %}
+        </td>
+        <td>
+          <a href="/admin/users/{{ pair.referred.telegram_id }}" class="btn btn-sm">View invitee</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No referrals yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 0 %}<a href="/admin/referrals?page={{ page - 1 }}">← Prev</a>{% endif %}
+  <span>Page {{ page + 1 }} / {{ total_pages }}</span>
+  {% if page + 1 < total_pages %}<a href="/admin/referrals?page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

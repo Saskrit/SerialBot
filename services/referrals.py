@@ -43,8 +43,19 @@ async def process_new_user_referral(
         (
             "🎁 <b>New invite!</b>\n\n"
             "Someone joined Serial Hub using your link.\n"
-            f"You earned <b>{REFERRAL_BONUS_WATCHES}</b> bonus watches.\n"
-            f"Bonus watches available: <b>{credits}</b>"
+            f"You and your friend each earned <b>{REFERRAL_BONUS_WATCHES}</b> bonus watches.\n"
+            f"Your bonus watches available: <b>{credits}</b>"
+        ),
+        parse_mode="HTML",
+    )
+    await send_private_message(
+        bot,
+        new_user_id,
+        (
+            "🎁 <b>Welcome bonus!</b>\n\n"
+            "You joined through a friend's invite link.\n"
+            f"You received <b>{REFERRAL_BONUS_WATCHES}</b> bonus watches.\n"
+            "Use them after your daily free limit."
         ),
         parse_mode="HTML",
     )
@@ -62,7 +73,7 @@ async def build_referral_text(bot: Bot, user: dict) -> str:
         "🎁 <b>Refer & Watch</b>",
         "",
         "Invite friends to Serial Hub. When someone joins using your link, "
-        f"you get <b>{REFERRAL_BONUS_WATCHES} bonus watches</b> per invite.",
+        f"you <b>and your friend</b> each get <b>{REFERRAL_BONUS_WATCHES} bonus watches</b>.",
         "",
         "Each person can only join through one referrer.",
         "",

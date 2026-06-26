@@ -1,0 +1,6 @@
+{% macro user_link(user) %}
+<strong>{{ user.first_name or 'Unknown' }}</strong>
+{% if user.username %}<span class="muted">@{{ user.username }}</span>{% endif %}
+<code>{{ user.telegram_id }}</code>
+<a href="/admin/users/{{ user.telegram_id }}" class="btn btn-sm">Open</a>
+{% endmacro %}

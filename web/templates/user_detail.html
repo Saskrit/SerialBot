@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "referral_macros.html" import user_link %}
 {% block title %}User {{ user.telegram_id }} — Serial Hub Admin{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/admin/static/pages/user-detail.css">{% endblock %}
 {% block content %}
@@ -25,9 +26,8 @@
       <dt>VIP expires</dt><dd>{% if user.vip_expires %}{{ format_date(user.vip_expires) }}{% else %}—{% endif %}</dd>
       <dt>Daily watches</dt><dd>{{ user.daily_watches }}{% if user.plan != 'vip' %} / {{ free_limit if free_limit > 0 else '∞' }}{% endif %}</dd>
       <dt>Unlocked episodes</dt><dd>{{ user.unlocked_episodes|length if user.unlocked_episodes else 0 }}</dd>
-      <dt>Referral invites</dt><dd>{{ user.referral_count or 0 }}</dd>
+      <dt>Referral invites sent</dt><dd>{{ user.referral_count or 0 }}</dd>
       <dt>Bonus watches</dt><dd>{{ user.referral_watch_credits or 0 }}</dd>
-      <dt>Referred by</dt><dd>{% if user.referred_by %}<code>{{ user.referred_by }}</code>{% else %}—{% endif %}</dd>
       <dt>Banned</dt><dd>{{ 'Yes' if user.banned else 'No' }}</dd>
       <dt>Registered</dt><dd>{% if user.registered_at %}{{ format_datetime(user.registered_at) }}{% else %}—{% endif %}</dd>
       <dt>Last active</dt><dd>{% if user.last_active %}{{ format_datetime(user.last_active) }}{% else %}—{% endif %}</dd>
@@ -66,6 +66,38 @@
       </form>
     </div>
   </div>
+</div>
+
+<div class="card referral-card">
+  <h2 class="card-title">Referrals</h2>
+  {% if referrer %}
+  <div class="referral-block">
+    <h3>Invited by</h3>
+    <p class="invite-line">{{ user_link(referrer) }} invited this user</p>
+    {% if user.referred_at %}<p class="muted">Joined via invite: {{ format_datetime(user.referred_at) }}</p>{% endif %}
+  </div>
+  {% else %}
+  <p class="muted">Not referred by anyone.</p>
+  {% endif %}
+
+  <div class="referral-block">
+    <h3>Users invited ({{ referred_users|length }})</h3>
+    {% if referred_users %}
+    <ul class="referred-list">
+      {% for invited in referred_users %}
+      <li>
+        {{ user_link(invited) }}
+        {% if invited.referred_at or invited.registered_at %}
+        <span class="muted">· {{ format_datetime(invited.referred_at or invited.registered_at) }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">This user has not invited anyone yet.</p>
+    {% endif %}
+  </div>
+  <p style="margin-top:1rem"><a href="/admin/referrals" class="btn btn-sm">View all referrals</a></p>
 </div>
 
 {% if user.unlocked_episodes %}

@@ -47,11 +47,14 @@ async def get_or_create_user(
         "first_name": first_name,
         "plan": "free",
         "vip_expires": None,
+        "membership_tier": None,
+        "daily_pass_expires": None,
         "daily_watches": 0,
         "daily_reset_date": _today().isoformat(),
         "referral_watch_credits": 0,
         "referral_count": 0,
         "referred_by": None,
+        "referred_at": None,
         "unlocked_episodes": [],
         "trial_episodes": [],
         "banned": False,
@@ -75,20 +78,43 @@ async def _normalize_daily_usage(user: dict[str, Any]) -> dict[str, Any]:
     return await _check_vip_expiry(user)
 
 
-async def _check_vip_expiry(user: dict[str, Any]) -> dict[str, Any]:
-    if user.get("plan") != "vip":
-        return user
+def has_active_daily_pass(user: dict[str, Any]) -> bool:
+    expires = ensure_aware(user.get("daily_pass_expires"))
+    if not expires:
+        return False
+    return expires > datetime.now(TZ)
 
-    expires = ensure_aware(user.get("vip_expires"))
+
+def has_unlimited_watching(user: dict[str, Any]) -> bool:
+    if user.get("plan") == "vip":
+        return True
+    return has_active_daily_pass(user)
+
+
+async def _check_vip_expiry(user: dict[str, Any]) -> dict[str, Any]:
     now = datetime.now(TZ)
-    if expires and expires < now:
-        db = get_db()
-        await db.users.update_one(
+    updates: dict[str, Any] = {}
+
+    if user.get("plan") == "vip":
+        expires = ensure_aware(user.get("vip_expires"))
+        if expires and expires < now:
+            updates["plan"] = "free"
+            updates["vip_expires"] = None
+            updates["membership_tier"] = None
+            user["plan"] = "free"
+            user["vip_expires"] = None
+            user["membership_tier"] = None
+
+    daily_expires = ensure_aware(user.get("daily_pass_expires"))
+    if daily_expires and daily_expires < now:
+        updates["daily_pass_expires"] = None
+        user["daily_pass_expires"] = None
+
+    if updates:
+        await get_db().users.update_one(
             {"telegram_id": user["telegram_id"]},
-            {"$set": {"plan": "free", "vip_expires": None}},
+            {"$set": updates},
         )
-        user["plan"] = "free"
-        user["vip_expires"] = None
     return user
 
 
@@ -236,7 +262,9 @@ async def get_episode_watchers(
     return watchers[:limit]
 
 
-async def grant_vip(telegram_id: int, days: int = 30) -> datetime:
+async def grant_vip(
+    telegram_id: int, days: int = 30, *, tier: str | None = None
+) -> datetime:
     now = datetime.now(TZ)
     db = get_db()
     user = await db.users.find_one({"telegram_id": telegram_id})
@@ -247,14 +275,57 @@ async def grant_vip(telegram_id: int, days: int = 30) -> datetime:
         if current_expires and current_expires > now:
             base = current_expires
     expires = base + timedelta(days=days)
+    update_fields: dict[str, Any] = {
+        "plan": "vip",
+        "vip_expires": expires,
+        "last_active": now,
+    }
+    if tier:
+        update_fields["membership_tier"] = tier
     await db.users.update_one(
         {"telegram_id": telegram_id},
         {
-            "$set": {"plan": "vip", "vip_expires": expires, "last_active": now},
+            "$set": update_fields,
             "$setOnInsert": {
                 "telegram_id": telegram_id,
                 "username": None,
                 "first_name": None,
+                "daily_watches": 0,
+                "daily_reset_date": _today().isoformat(),
+                "unlocked_episodes": [],
+                "daily_pass_expires": None,
+                "membership_tier": tier,
+                "banned": False,
+                "registered_at": now,
+            },
+        },
+        upsert=True,
+    )
+    return expires
+
+
+async def grant_daily_pass(telegram_id: int, *, hours: int = 24) -> datetime:
+    now = datetime.now(TZ)
+    db = get_db()
+    user = await db.users.find_one({"telegram_id": telegram_id})
+    base = now
+    if user:
+        user = normalize_user_datetimes(await _normalize_daily_usage(user))
+        current_expires = ensure_aware(user.get("daily_pass_expires"))
+        if current_expires and current_expires > now:
+            base = current_expires
+    expires = base + timedelta(hours=hours)
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {
+            "$set": {"daily_pass_expires": expires, "last_active": now},
+            "$setOnInsert": {
+                "telegram_id": telegram_id,
+                "username": None,
+                "first_name": None,
+                "plan": "free",
+                "vip_expires": None,
+                "membership_tier": None,
                 "daily_watches": 0,
                 "daily_reset_date": _today().isoformat(),
                 "unlocked_episodes": [],
@@ -275,7 +346,7 @@ async def grant_episode_unlock(telegram_id: int, episode_id: str) -> None:
 
 
 async def has_free_watch_allowance(user: dict[str, Any]) -> bool:
-    if user.get("plan") == "vip":
+    if has_unlimited_watching(user):
         return True
     limit = await get_free_daily_limit()
     if is_free_unlimited(limit):
@@ -298,12 +369,13 @@ async def apply_referral(
     if not referrer:
         return False, "referrer_not_found", None
 
+    now = datetime.now(TZ)
     referred = await db.users.find_one_and_update(
         {
             "telegram_id": new_user_id,
             "$or": [{"referred_by": None}, {"referred_by": {"$exists": False}}],
         },
-        {"$set": {"referred_by": referrer_id}},
+        {"$set": {"referred_by": referrer_id, "referred_at": now}},
         return_document=ReturnDocument.AFTER,
     )
     if not referred:
@@ -318,6 +390,10 @@ async def apply_referral(
             }
         },
     )
+    await db.users.update_one(
+        {"telegram_id": new_user_id},
+        {"$inc": {"referral_watch_credits": bonus_watches}},
+    )
     updated_referrer = await db.users.find_one({"telegram_id": referrer_id})
     credits = updated_referrer.get("referral_watch_credits", 0) if updated_referrer else bonus_watches
     return True, "ok", credits
@@ -331,7 +407,7 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
     if user.get("banned"):
         return False, "Your account has been suspended. Contact support."
 
-    if user.get("plan") == "vip":
+    if has_unlimited_watching(user):
         return True, ""
 
     if episode_id in user.get("unlocked_episodes", []):
@@ -350,7 +426,7 @@ async def can_watch_episode(user: dict[str, Any], episode_id: str) -> tuple[bool
 async def has_used_trial_episode(user: dict[str, Any], episode_id: str) -> bool:
     from services.settings import get_trial_episode_ttl_seconds
 
-    if user.get("plan") == "vip":
+    if user.get("plan") == "vip" or has_active_daily_pass(user):
         return False
     if episode_id in user.get("unlocked_episodes", []):
         return False
@@ -408,7 +484,7 @@ async def get_pending_trial_deletions() -> list[dict[str, Any]]:
 
 
 async def is_episode_daily_locked(user: dict[str, Any], episode_id: str) -> bool:
-    if user.get("plan") == "vip":
+    if has_unlimited_watching(user):
         return False
     if episode_id in user.get("unlocked_episodes", []):
         return False
@@ -471,6 +547,7 @@ async def list_users(page: int, per_page: int = 15) -> tuple[list[dict[str, Any]
                 "banned": 1,
                 "daily_watches": 1,
                 "registered_at": 1,
+                "referred_by": 1,
             },
         )
         .sort("registered_at", -1)
@@ -479,6 +556,57 @@ async def list_users(page: int, per_page: int = 15) -> tuple[list[dict[str, Any]
     )
     users = await cursor.to_list(length=per_page)
     return users, total
+
+
+async def list_referred_users(referrer_id: int) -> list[dict[str, Any]]:
+    db = get_db()
+    cursor = (
+        db.users.find({"referred_by": referrer_id})
+        .sort([("referred_at", -1), ("registered_at", -1)])
+    )
+    return await cursor.to_list(length=500)
+
+
+async def list_referral_pairs(
+    page: int, per_page: int = 20
+) -> tuple[list[dict[str, Any]], int]:
+    db = get_db()
+    query = {"referred_by": {"$ne": None, "$exists": True}}
+    total = await db.users.count_documents(query)
+    cursor = (
+        db.users.find(query)
+        .sort([("referred_at", -1), ("registered_at", -1)])
+        .skip(page * per_page)
+        .limit(per_page)
+    )
+    referred_users = await cursor.to_list(length=per_page)
+    if not referred_users:
+        return [], total
+
+    referrer_ids = list({u["referred_by"] for u in referred_users if u.get("referred_by")})
+    referrers: dict[int, dict[str, Any]] = {}
+    if referrer_ids:
+        async for doc in db.users.find({"telegram_id": {"$in": referrer_ids}}):
+            referrers[doc["telegram_id"]] = doc
+
+    pairs: list[dict[str, Any]] = []
+    for referred in referred_users:
+        referrer_id = referred.get("referred_by")
+        pairs.append(
+            {
+                "referrer": referrers.get(referrer_id),
+                "referrer_id": referrer_id,
+                "referred": referred,
+                "referred_at": referred.get("referred_at") or referred.get("registered_at"),
+            }
+        )
+    return pairs, total
+
+
+async def count_referrals() -> int:
+    return await get_db().users.count_documents(
+        {"referred_by": {"$ne": None, "$exists": True}}
+    )
 
 
 async def get_episodes(serial_slug: str, page: int, per_page: int) -> tuple[list[dict], int]:

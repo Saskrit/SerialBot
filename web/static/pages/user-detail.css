@@ -32,6 +32,39 @@
   color: var(--text);
 }
 
+.page-user-detail .referral-card {
+  margin-top: 1.25rem;
+}
+
+.page-user-detail .referral-block {
+  margin-bottom: 1.25rem;
+}
+
+.page-user-detail .referral-block h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.page-user-detail .invite-line {
+  margin: 0;
+}
+
+.page-user-detail .referred-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.page-user-detail .referred-list li {
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-user-detail .referred-list li:last-child {
+  border-bottom: none;
+}
+
 @media (max-width: 900px) {
   .page-user-detail .two-col {
     grid-template-columns: 1fr;

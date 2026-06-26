@@ -1,57 +1,107 @@
 {% extends "site/base.html" %}
 {% from "site/icons.html" import icon %}
-{% block title %}VIP Plan — Serial Hub{% endblock %}
+{% block title %}Membership Plans — Serial Hub{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/plan.css">{% endblock %}
 {% block content %}
 <div class="container">
   <div class="page-header">
-    <h1>Plans &amp; membership</h1>
-    <p>Free tier to get started — upgrade when you want more.</p>
+    <h1>Membership &amp; monetization</h1>
+    <p>Free tier to get started — upgrade when you want more. Monthly VIP is our recommended plan.</p>
   </div>
 
-  <div class="plan-grid">
-    <div class="plan-card card">
+  <div class="plan-section">
+    <h2 class="section-label">Free tier</h2>
+    <div class="plan-card card plan-free">
       <span class="plan-tag icon-inline">{{ icon('check', 14) }} Free</span>
-      <h2>Free tier</h2>
+      <h3>Free Tier</h3>
       <p class="plan-price">{{ free_limit_label }}</p>
       <ul>
         <li>Browse &amp; search all serials</li>
+        <li>Limited daily episodes</li>
+        <li>Episode Pass available (₹10)</li>
         <li>Refer friends for bonus watches</li>
-        <li>Episode unlocks available</li>
       </ul>
-      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-outline" target="_blank" rel="noopener">{{ icon('send', 16) }} Get started</a>{% endif %}
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-outline" target="_blank" rel="noopener">{{ icon('send', 16) }} Open bot</a>{% endif %}
     </div>
+  </div>
 
-    <div class="plan-card card featured">
-      <span class="plan-tag icon-inline">{{ icon('crown', 14) }} VIP</span>
-      <h2>VIP membership</h2>
-      <p class="plan-price">Unlimited daily</p>
-      <ul>
-        <li>Unlimited episodes every day</li>
-        <li>Full archive access</li>
-        <li>Episode request priority</li>
-        <li>Priority support</li>
-      </ul>
-      <a href="{{ payment_contact_url }}" class="btn btn-primary" target="_blank" rel="noopener">{{ icon('message', 16) }} Contact {{ payment_contact }}</a>
+  <div class="plan-section">
+    <h2 class="section-label">Pay-per-use</h2>
+    <div class="plan-grid plan-grid-2">
+      {% for plan in pay_per_use_plans %}
+      <div class="plan-card card">
+        <span class="plan-tag">{{ plan.name }}</span>
+        <h3>{{ plan.name }}</h3>
+        <p class="plan-price">{{ plan.price_label }}</p>
+        <p class="plan-validity">{{ plan.validity }}</p>
+        <ul>
+          {% for benefit in plan.benefits %}
+          <li>{{ benefit }}</li>
+          {% endfor %}
+        </ul>
+        <a href="{{ payment_contact_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">{{ icon('message', 16) }} Get {{ plan.name }}</a>
+      </div>
+      {% endfor %}
     </div>
+  </div>
 
-    <div class="plan-card card">
-      <span class="plan-tag icon-inline">{{ icon('gift', 14) }} Refer</span>
-      <h2>Refer &amp; watch</h2>
-      <p class="plan-price">+5 watches / invite</p>
-      <ul>
-        <li>Share your invite link in the bot</li>
-        <li>Earn bonus watches per friend</li>
-        <li>Each friend can only join once</li>
+  <div class="plan-section">
+    <h2 class="section-label">VIP subscriptions</h2>
+    <div class="plan-grid">
+      {% for plan in vip_plans %}
+      <div class="plan-card card{% if plan.recommended %} featured recommended{% elif plan.badge == 'Best Value' %} best-value{% elif plan.badge == 'Maximum Savings' %} max-savings{% endif %}">
+        {% if plan.badge %}
+        <span class="plan-badge{% if plan.recommended %} badge-recommended{% endif %}">{{ plan.badge }}</span>
+        {% endif %}
+        <span class="plan-tag icon-inline">{{ icon('crown', 14) }} {{ plan.name }}</span>
+        <h3>{{ plan.name }}</h3>
+        <p class="plan-price">{{ plan.price_label }}</p>
+        <p class="plan-validity">{{ plan.validity }}</p>
+        <ul>
+          {% for benefit in plan.benefits %}
+          <li>{{ benefit }}</li>
+          {% endfor %}
+        </ul>
+        <a href="{{ payment_contact_url }}" class="btn {% if plan.recommended %}btn-primary{% else %}btn-outline{% endif %} btn-sm" target="_blank" rel="noopener">{{ icon('message', 16) }} Choose {{ plan.name }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="plan-section">
+    <h2 class="section-label">VIP privileges</h2>
+    <div class="vip-perks card">
+      <ul class="perks-list">
+        {% for perk in vip_privileges %}
+        <li class="icon-inline">{{ icon('check', 16) }} {{ perk }}</li>
+        {% endfor %}
       </ul>
-      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-secondary" target="_blank" rel="noopener">{{ icon('users', 16) }} Open bot</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="plan-section">
+    <h2 class="section-label">Refer &amp; watch</h2>
+    <div class="plan-card card plan-refer">
+      <span class="plan-tag icon-inline">{{ icon('gift', 14) }} Referral</span>
+      <h3>Refer &amp; Watch</h3>
+      <p class="plan-price">+5 watches each</p>
+      <ul>
+        <li>Every user gets a unique referral link</li>
+        <li>You and your friend each receive 5 bonus watches</li>
+        <li>Each user can only be referred once</li>
+        <li>Bonus watches used after daily limit</li>
+      </ul>
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-secondary" target="_blank" rel="noopener">{{ icon('users', 16) }} Get your link in bot</a>{% endif %}
     </div>
   </div>
 
   <div class="payment-note card">
-    <h3 class="icon-inline">{{ icon('message', 20) }} Payment &amp; unlocks</h3>
-    <p>All payments and VIP upgrades are handled by <strong>{{ payment_contact }}</strong> on Telegram. Message them with your Telegram ID after opening the bot.</p>
-    <a href="{{ payment_contact_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">{{ icon('send', 16) }} Message {{ payment_contact }}</a>
+    <h3 class="icon-inline">{{ icon('message', 20) }} How to purchase</h3>
+    <p>All payments are handled by <strong>{{ payment_contact }}</strong> on Telegram. Open the bot, choose a plan, and message them with your Telegram ID. <strong>Monthly VIP (₹99)</strong> is recommended for the best balance of price and features.</p>
+    <div class="payment-actions">
+      <a href="{{ payment_contact_url }}" class="btn btn-primary" target="_blank" rel="noopener">{{ icon('send', 16) }} Message {{ payment_contact }}</a>
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-outline" target="_blank" rel="noopener">{{ icon('smartphone', 16) }} Open Telegram bot</a>{% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}

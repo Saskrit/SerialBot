@@ -6,6 +6,15 @@ from aiohttp import web
 from config import PAYMENT_CONTACT_USERNAME, SERIALS_PER_PAGE
 from database import repository as repo
 from database.connection import get_db
+from services.membership import (
+    ANNUAL_VIP,
+    DAILY_PASS,
+    EPISODE_PASS,
+    MONTHLY_VIP,
+    QUARTERLY_VIP,
+    VIP_PRIVILEGES,
+    WEEKLY_VIP,
+)
 from services.messages import format_date, format_month_year
 from services.payment_contact import payment_contact_label, payment_contact_url
 from services.serial_matcher import search_serials
@@ -163,6 +172,9 @@ async def plan_page(request: web.Request) -> web.Response:
         "site/plan.html",
         request,
         free_limit_label=format_free_limit_label(free_limit),
+        pay_per_use_plans=[EPISODE_PASS, DAILY_PASS],
+        vip_plans=[WEEKLY_VIP, MONTHLY_VIP, QUARTERLY_VIP, ANNUAL_VIP],
+        vip_privileges=VIP_PRIVILEGES,
     )
 
 

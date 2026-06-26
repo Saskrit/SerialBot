@@ -1,9 +1,14 @@
 from datetime import datetime
 
-from config import EPISODES_PER_PAGE, TZ, SERIALS_PER_PAGE
+from config import EPISODES_PER_PAGE, REFERRAL_BONUS_WATCHES, TZ, SERIALS_PER_PAGE
 from database import repository as repo
 from database.datetime_utils import ensure_aware
 from services.date_query import UserDateQuery, format_user_date_label
+from services.membership import (
+    MONTHLY_VIP,
+    VIP_PRIVILEGES,
+    get_plan,
+)
 from services.payment_contact import payment_contact_label
 from services.settings import format_free_limit_label, get_free_daily_limit, is_free_unlimited
 
@@ -20,8 +25,31 @@ def format_datetime(dt: datetime) -> str:
 
 def plan_label(user: dict) -> str:
     if user.get("plan") == "vip":
+        tier_id = user.get("membership_tier")
+        tier = get_plan(tier_id) if tier_id else None
+        if tier:
+            return tier.name
         return "VIP Member"
+    if repo.has_active_daily_pass(user):
+        return "Daily Unlimited Pass"
     return "Free Tier"
+
+
+def _daily_pass_remaining(user: dict) -> str | None:
+    if not repo.has_active_daily_pass(user):
+        return None
+    expires = ensure_aware(user.get("daily_pass_expires"))
+    if not expires:
+        return None
+    now = datetime.now(TZ)
+    if expires <= now:
+        return None
+    delta = expires - now
+    hours = delta.seconds // 3600 + delta.days * 24
+    minutes = (delta.seconds % 3600) // 60
+    if hours > 0:
+        return f"{hours} hour(s) {minutes} min remaining"
+    return f"{minutes} minute(s) remaining"
 
 
 def _usage_summary(user: dict, *, daily_limit: int) -> str:
@@ -29,6 +57,12 @@ def _usage_summary(user: dict, *, daily_limit: int) -> str:
     bonus = user.get("referral_watch_credits", 0)
     if user.get("plan") == "vip":
         return "Unlimited (VIP)"
+    if repo.has_active_daily_pass(user):
+        remaining = _daily_pass_remaining(user)
+        base = "Unlimited (Daily Pass · 24h)"
+        if remaining:
+            base += f" · {remaining}"
+        return base
     if is_free_unlimited(daily_limit):
         base = f"{watched} watched today · unlimited free access"
     else:
@@ -172,58 +206,123 @@ async def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
 
 async def build_plan_text(user: dict) -> str:
     daily_limit = await get_free_daily_limit()
-    if user.get("plan") == "vip":
-        lines = [
-            "📋 <b>My Plan</b>",
-            "",
-            "⭐ <b>You are a VIP Member</b>",
-            "",
-            "✅ Unlimited episodes daily",
-            "✅ Full archive access",
-            "✅ Episode request priority",
-            "✅ Priority support",
-        ]
-        expires = ensure_aware(user.get("vip_expires"))
-        if expires:
-            lines.append(f"\nValid until: <b>{format_date(expires)}</b>")
-            remaining = _vip_time_remaining(user)
-            if remaining:
-                lines.append(f"Time remaining: <b>{remaining}</b>")
-        return "\n".join(lines)
-
     lines = [
-        "📋 <b>My Plan</b>",
+        "📋 <b>My Membership</b>",
         "",
         f"Plan: <b>{plan_label(user)}</b>",
         f"Status: {'🚫 Banned' if user.get('banned') else '✅ Active'}",
-        f"Daily usage: <b>{_usage_summary(user, daily_limit=daily_limit)}</b>",
     ]
+
     registered = user.get("registered_at")
     if registered:
-        lines.append(f"Registered: {format_date(registered)}")
+        lines.append(f"Registered: <b>{format_date(registered)}</b>")
 
-    unlocks = user.get("unlocked_episodes", [])
-    if unlocks:
-        lines.append(f"Active unlocks: <b>{len(unlocks)}</b> episode(s)")
-
-    invites = user.get("referral_count", 0)
-    bonus = user.get("referral_watch_credits", 0)
-    if invites or bonus:
-        lines.append(f"Referrals: <b>{invites}</b> invite(s) · <b>{bonus}</b> bonus watch(es)")
-
-    free_line = (
-        "Free users have unlimited daily episodes."
-        if is_free_unlimited(daily_limit)
-        else f"Free users get {format_free_limit_label(daily_limit)}."
-    )
     lines.extend(
         [
             "",
-            free_line,
-            f"Contact {payment_contact_label()} for payment and membership.",
-            "🎁 Invite friends — each join gives <b>5 bonus watches</b> (tap Refer & Watch).",
+            "📊 <b>Today's Usage</b>",
+            f"Episodes: <b>{_usage_summary(user, daily_limit=daily_limit)}</b>",
         ]
     )
+
+    bonus = user.get("referral_watch_credits", 0)
+    if bonus > 0:
+        lines.append(f"Bonus credits: <b>{bonus}</b> watch(es)")
+
+    invites = user.get("referral_count", 0)
+    lines.append(f"Total referrals: <b>{invites}</b>")
+
+    unlocks = user.get("unlocked_episodes", [])
+    if unlocks:
+        lines.append(f"Purchased episodes: <b>{len(unlocks)}</b> permanent unlock(s)")
+
+    if user.get("plan") == "vip":
+        lines.extend(["", "⭐ <b>VIP Privileges</b>"])
+        for perk in VIP_PRIVILEGES:
+            lines.append(f"✅ {perk}")
+        expires = ensure_aware(user.get("vip_expires"))
+        if expires:
+            lines.append(f"\nVIP expires: <b>{format_datetime(expires)}</b>")
+            remaining = _vip_time_remaining(user)
+            if remaining:
+                lines.append(f"Time remaining: <b>{remaining}</b>")
+    elif repo.has_active_daily_pass(user):
+        expires = ensure_aware(user.get("daily_pass_expires"))
+        if expires:
+            lines.append(f"\nDaily Pass expires: <b>{format_datetime(expires)}</b>")
+            remaining = _daily_pass_remaining(user)
+            if remaining:
+                lines.append(f"Time remaining: <b>{remaining}</b>")
+    else:
+        free_line = (
+            "Free users currently have unlimited daily episodes."
+            if is_free_unlimited(daily_limit)
+            else f"Free tier: {format_free_limit_label(daily_limit)}."
+        )
+        lines.extend(
+            [
+                "",
+                free_line,
+                f"🎁 Refer friends — you and your friend each get <b>{REFERRAL_BONUS_WATCHES}</b> bonus watches.",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            f"Upgrade or renew via <b>{payment_contact_label()}</b>.",
+            f"⭐ <b>{MONTHLY_VIP.name}</b> ({MONTHLY_VIP.price_label}) is our recommended plan.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def build_membership_catalog_text() -> str:
+    lines = [
+        "⭐ <b>Membership Plans</b>",
+        "",
+        "Choose the plan that fits you. Contact payment after selecting a plan.",
+        "",
+        f"<b>Episode Pass</b> — ₹10",
+        "Unlock one episode · permanent access",
+        "",
+        f"<b>Daily Unlimited Pass</b> — ₹19",
+        "Unlimited for 24 hours · binge watching",
+        "",
+        f"<b>Weekly VIP</b> — ₹39 · 7 days",
+        f"<b>Monthly VIP</b> — ₹99 · 30 days ⭐ <b>Recommended</b>",
+        f"<b>Quarterly VIP</b> — ₹249 · 90 days 💎 <b>Best Value</b>",
+        f"<b>Annual VIP</b> — ₹799 · 12 months 🏆 <b>Maximum Savings</b>",
+        "",
+        "<b>VIP Privileges</b>",
+    ]
+    for perk in VIP_PRIVILEGES:
+        lines.append(f"• {perk}")
+    return "\n".join(lines)
+
+
+async def build_upgrade_screen_text(user: dict, *, episode_id: str | None = None) -> str:
+    daily_limit = await get_free_daily_limit()
+    lines = [
+        "⏳ <b>Daily limit reached</b>",
+        "",
+        f"Today's usage: <b>{_usage_summary(user, daily_limit=daily_limit)}</b>",
+        "",
+        "Upgrade to keep watching — compare plans below:",
+        "",
+        "⏳ <b>Continue Free Tomorrow</b> — limit resets at midnight",
+        "🔓 <b>Episode Pass</b> — ₹10 · unlock this episode permanently",
+        "⚡ <b>Daily Unlimited Pass</b> — ₹19 · unlimited for 24 hours",
+        "📅 <b>Weekly VIP</b> — ₹39 · 7 days unlimited",
+        f"⭐ <b>Monthly VIP</b> — ₹99 · 30 days <b>(Recommended)</b>",
+        "💎 <b>Quarterly VIP</b> — ₹249 · 90 days (Best Value)",
+        "🏆 <b>Annual VIP</b> — ₹799 · 12 months (Maximum Savings)",
+    ]
+    if episode_id:
+        lines.append(f"\nSelected episode: <code>{episode_id}</code>")
+    bonus = user.get("referral_watch_credits", 0)
+    if bonus > 0:
+        lines.append(f"\nYou still have <b>{bonus}</b> bonus watch credit(s) for other episodes.")
     return "\n".join(lines)
 
 
@@ -268,7 +367,7 @@ async def build_episode_list_text(
         lines.extend(
             [
                 "",
-                "🔒 <b>Daily limit reached</b> — use bonus watches or contact for VIP/unlock.",
+                "🔒 <b>Daily limit reached</b> — upgrade or use bonus watches.",
             ]
         )
     return "\n".join(lines), total_pages
@@ -327,7 +426,7 @@ async def build_date_episodes_text(
         lines.extend(
             [
                 "",
-                "🔒 <b>Daily limit reached</b> — use bonus watches or contact for VIP/unlock.",
+                "🔒 <b>Daily limit reached</b> — upgrade or use bonus watches.",
             ]
         )
     return "\n".join(lines), total_pages

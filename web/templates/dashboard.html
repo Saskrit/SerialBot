@@ -39,6 +39,10 @@
     <div class="stat-value">{{ total_views }}</div>
     <div class="stat-label">Total views</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ referral_count }}</div>
+    <div class="stat-label">Referral invites</div>
+  </div>
   <div class="stat-card highlight">
     <div class="stat-value">{{ pending }}</div>
     <div class="stat-label">Pending payments</div>
@@ -69,7 +73,8 @@
     <div class="table-actions">
       <a href="/admin/serials/new" class="btn btn-sm btn-primary">Add serial</a>
       <a href="/admin/episodes" class="btn btn-sm">Manage episodes</a>
-      <a href="/admin/payments" class="btn btn-sm">Review payments</a>
+      <a href="/admin/users" class="btn btn-sm">Users</a>
+      <a href="/admin/referrals" class="btn btn-sm">Referrals</a>
       <a href="/admin/broadcast" class="btn btn-sm">Send broadcast</a>
     </div>
     <p class="muted" style="margin-top:1rem">Episode video uploads stay in Telegram via the storage channel.</p>
