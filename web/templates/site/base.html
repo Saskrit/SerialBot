@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Serial Hub — watch your favourite TV serials on Telegram. Browse episodes, VIP plans, and more.">
+  <title>{% block title %}Serial Hub{% endblock %}</title>
+  <link rel="stylesheet" href="/static/base.css">
+  {% block page_css %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="logo">Serial <span>Hub</span></a>
+      <nav class="site-nav">
+        <a href="/" class="{% if path == '/' %}active{% endif %}">Home</a>
+        <a href="/serials" class="{% if path.startswith('/serials') %}active{% endif %}">Browse</a>
+        <a href="/search" class="{% if path.startswith('/search') %}active{% endif %}">Search</a>
+        <a href="/plan" class="{% if path == '/plan' %}active{% endif %}">VIP Plan</a>
+        {% if bot_url %}
+        <a href="{{ bot_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">Open Telegram</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <strong>Serial Hub</strong>
+          <p class="muted" style="margin:0.5rem 0 0;font-size:0.92rem">Your favourite serials, delivered on Telegram. Browse here — watch in the bot.</p>
+        </div>
+        <div>
+          <h4>Explore</h4>
+          <ul>
+            <li><a href="/serials">All serials</a></li>
+            <li><a href="/search">Search</a></li>
+            <li><a href="/plan">VIP &amp; pricing</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Connect</h4>
+          <ul>
+            {% if bot_url %}<li><a href="{{ bot_url }}" target="_blank" rel="noopener">Telegram bot</a></li>{% endif %}
+            <li><a href="{{ payment_contact_url }}" target="_blank" rel="noopener">{{ payment_contact }} — payments</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">© Serial Hub · Episodes are watched via Telegram</div>
+    </div>
+  </footer>
+</body>
+</html>

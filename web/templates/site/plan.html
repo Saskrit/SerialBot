@@ -1,0 +1,56 @@
+{% extends "site/base.html" %}
+{% block title %}VIP Plan — Serial Hub{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/static/pages/plan.css">{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <h1>Plans &amp; membership</h1>
+    <p>Free tier to get started — upgrade when you want more.</p>
+  </div>
+
+  <div class="plan-grid">
+    <div class="plan-card card">
+      <span class="plan-tag">Free</span>
+      <h2>Free tier</h2>
+      <p class="plan-price">{{ free_limit_label }}</p>
+      <ul>
+        <li>Browse &amp; search all serials</li>
+        <li>Refer friends for bonus watches</li>
+        <li>Episode unlocks available</li>
+      </ul>
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-outline" target="_blank" rel="noopener">Get started</a>{% endif %}
+    </div>
+
+    <div class="plan-card card featured">
+      <span class="plan-tag">VIP</span>
+      <h2>VIP membership</h2>
+      <p class="plan-price">Unlimited daily</p>
+      <ul>
+        <li>Unlimited episodes every day</li>
+        <li>Full archive access</li>
+        <li>Episode request priority</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="{{ payment_contact_url }}" class="btn btn-primary" target="_blank" rel="noopener">Contact {{ payment_contact }}</a>
+    </div>
+
+    <div class="plan-card card">
+      <span class="plan-tag">Refer</span>
+      <h2>Refer &amp; watch</h2>
+      <p class="plan-price">+5 watches / invite</p>
+      <ul>
+        <li>Share your invite link in the bot</li>
+        <li>Earn bonus watches per friend</li>
+        <li>Each friend can only join once</li>
+      </ul>
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-secondary" target="_blank" rel="noopener">Open bot → Refer</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="payment-note card">
+    <h3>Payment &amp; unlocks</h3>
+    <p>All payments and VIP upgrades are handled by <strong>{{ payment_contact }}</strong> on Telegram. Message them with your Telegram ID after opening the bot.</p>
+    <a href="{{ payment_contact_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">Message {{ payment_contact }}</a>
+  </div>
+</div>
+{% endblock %}

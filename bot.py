@@ -43,11 +43,12 @@ async def start_web_server() -> web.AppRunner:
     global _web_runner
     port = int(os.getenv("PORT", "10000"))
     app = web.Application()
-    app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
 
     from web.routes import setup_admin_routes
+    from web.user_routes import setup_user_routes
 
+    setup_user_routes(app, create_bot)
     setup_admin_routes(app, create_bot)
 
     runner = web.AppRunner(app)

@@ -1,0 +1,37 @@
+/* Episode list */
+
+.watch-note {
+  margin-bottom: 1.5rem;
+  background: var(--sky);
+  border-color: rgba(174, 226, 255, 0.8);
+}
+
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.episode-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.episode-date {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+
+.breadcrumb {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.breadcrumb a {
+  font-weight: 600;
+  color: var(--text-secondary);
+}

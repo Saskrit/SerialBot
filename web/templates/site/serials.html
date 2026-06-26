@@ -1,0 +1,41 @@
+{% extends "site/base.html" %}
+{% block title %}Browse Serials — Serial Hub{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/static/pages/serials.css">{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <h1>Browse serials</h1>
+    <p>{{ total }} show(s) in the catalog. Tap a serial to see episodes by month.</p>
+  </div>
+
+  {% if serials %}
+  <div class="card-grid">
+    {% for s in serials %}
+    <a href="/serials/{{ s.slug }}" class="serial-card">
+      <div class="serial-card-top">
+        {% if s.episode_count > 0 %}
+        <span class="badge badge-mint">{{ s.episode_count }} episode{% if s.episode_count != 1 %}s{% endif %}</span>
+        {% else %}
+        <span class="badge">Coming soon</span>
+        {% endif %}
+      </div>
+      <h3>{{ s.name }}</h3>
+      <p class="muted">View months &amp; dates</p>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 0 %}<a href="/serials?page={{ page - 1 }}" class="btn btn-outline btn-sm">← Prev</a>{% endif %}
+    <span class="muted">Page {{ page + 1 }} of {{ total_pages }}</span>
+    {% if page + 1 < total_pages %}<a href="/serials?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next →</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state">
+    <p>No serials yet. Check back soon or open the Telegram bot.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

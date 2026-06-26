@@ -1,0 +1,66 @@
+/* Serial detail */
+
+.breadcrumb {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.breadcrumb a {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.serial-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.serial-hero h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.85rem;
+  font-weight: 800;
+}
+
+.aliases {
+  margin: 0.75rem 0 0;
+  font-size: 0.92rem;
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.month-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.15rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.month-card:hover {
+  background: var(--lavender-light);
+  border-color: var(--lavender);
+  text-decoration: none;
+}
+
+.month-label {
+  font-weight: 700;
+}
+
+.month-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}

@@ -44,7 +44,6 @@ def _score_candidate(normalized_query: str, norm: str) -> float:
 
     score = difflib.SequenceMatcher(None, normalized_query, norm).ratio()
 
-    # Avoid "Mann Sundar" → Mannat style false positives (shared prefix, extra words).
     if (
         len(query_tokens) >= 2
         and len(cand_tokens) < len(query_tokens)
@@ -106,3 +105,35 @@ async def match_serial_best_from_text(text: str) -> dict | None:
             best_serial = serial
 
     return best_serial
+
+
+async def search_serials(query: str, *, limit: int = 24) -> list[dict]:
+    """Return active serials ranked by match score (for web search)."""
+    normalized_query = _normalize(query)
+    if not normalized_query:
+        return []
+
+    db = get_db()
+    serials = await db.serials.find({"active": True}).to_list(length=200)
+    scored: list[tuple[float, dict]] = []
+
+    for serial in serials:
+        candidates = [serial["name"], serial["slug"].replace("-", " ")]
+        candidates.extend(serial.get("aliases", []))
+        best_score = 0.0
+        for candidate in candidates:
+            best_score = max(
+                best_score, _score_candidate(normalized_query, _normalize(candidate))
+            )
+        if best_score >= 0.45:
+            scored.append((best_score, serial))
+
+    scored.sort(key=lambda item: (-item[0], item[1]["name"]))
+    results = []
+    for _, serial in scored[:limit]:
+        doc = dict(serial)
+        doc["episode_count"] = await db.episodes.count_documents(
+            {"serial_slug": serial["slug"]}
+        )
+        results.append(doc)
+    return results

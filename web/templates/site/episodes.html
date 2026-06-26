@@ -1,0 +1,51 @@
+{% extends "site/base.html" %}
+{% block title %}{{ serial.name }} — {{ format_month_year(year, month) }}{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/static/pages/episodes.css">{% endblock %}
+{% block content %}
+<div class="container">
+  <nav class="breadcrumb">
+    <a href="/serials">Serials</a>
+    <span>/</span>
+    <a href="/serials/{{ serial.slug }}">{{ serial.name }}</a>
+    <span>/</span>
+    <span>{{ format_month_year(year, month) }}</span>
+  </nav>
+
+  <div class="page-header">
+    <h1>{{ serial.name }}</h1>
+    <p>{{ format_month_year(year, month) }} · {{ total }} episode{% if total != 1 %}s{% endif %}</p>
+  </div>
+
+  <div class="watch-note card">
+    <strong>📱 Watch on Telegram</strong>
+    <p class="muted" style="margin:0.35rem 0 0">Episodes play in the Serial Hub bot. Open Telegram, search for this serial, and tap the date to watch.</p>
+    {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-primary btn-sm" style="margin-top:0.75rem" target="_blank" rel="noopener">Open bot</a>{% endif %}
+  </div>
+
+  {% if episodes %}
+  <div class="episode-list">
+    {% for ep in episodes %}
+    <div class="episode-row card">
+      <div>
+        <div class="episode-date">{{ format_date(ep.date) }}</div>
+        {% if ep.view_count %}<span class="badge badge-sky">{{ ep.view_count }} views</span>{% endif %}
+      </div>
+      {% if bot_url %}
+      <a href="{{ bot_url }}" class="btn btn-outline btn-sm" target="_blank" rel="noopener">Watch</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 0 %}<a href="?page={{ page - 1 }}" class="btn btn-outline btn-sm">← Prev</a>{% endif %}
+    <span class="muted">Page {{ page + 1 }} of {{ total_pages }}</span>
+    {% if page + 1 < total_pages %}<a href="?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next →</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state"><p>No episodes for this month.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

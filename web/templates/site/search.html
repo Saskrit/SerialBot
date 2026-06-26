@@ -1,0 +1,38 @@
+{% extends "site/base.html" %}
+{% block title %}Search — Serial Hub{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/static/pages/search.css">{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <h1>Search serials</h1>
+    <p>Find a show by name, slug, or alias.</p>
+  </div>
+
+  <form class="search-bar" method="get" action="/search">
+    <input type="search" name="q" value="{{ query }}" placeholder="e.g. Laughter Chef 3" autofocus>
+    <button type="submit" class="btn btn-primary">Search</button>
+  </form>
+
+  {% if query %}
+  <p class="results-meta muted">{{ results|length }} result(s) for “{{ query }}”</p>
+
+  {% if results %}
+  <div class="card-grid" style="margin-top:1.5rem">
+    {% for s in results %}
+    <a href="/serials/{{ s.slug }}" class="serial-card">
+      <div class="serial-card-top">
+        <span class="badge badge-lavender">{{ s.episode_count }} eps</span>
+      </div>
+      <h3>{{ s.name }}</h3>
+      <p class="muted">{{ s.slug }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" style="margin-top:1.5rem">
+    <p>No serials matched. Try another spelling or <a href="/serials">browse all</a>.</p>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

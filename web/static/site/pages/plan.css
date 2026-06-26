@@ -1,0 +1,70 @@
+/* Plan page */
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-card.featured {
+  border: 2px solid var(--lavender);
+  background: var(--lavender-light);
+}
+
+.plan-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.plan-card h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+}
+
+.plan-price {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #5c5fe0;
+  margin: 0 0 1rem;
+}
+
+.plan-card ul {
+  margin: 0 0 1.25rem;
+  padding-left: 1.2rem;
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.plan-card li {
+  margin-bottom: 0.4rem;
+}
+
+.plan-card .btn {
+  align-self: flex-start;
+}
+
+.payment-note {
+  background: var(--mint);
+  border-color: rgba(217, 249, 223, 0.9);
+}
+
+.payment-note h3 {
+  margin: 0 0 0.5rem;
+}
+
+.payment-note p {
+  margin: 0 0 1rem;
+  color: var(--text-secondary);
+}

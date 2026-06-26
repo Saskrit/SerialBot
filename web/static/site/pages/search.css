@@ -1,0 +1,26 @@
+/* Search */
+
+.results-meta {
+  margin-top: 1.25rem;
+}
+
+.serial-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.35rem;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s;
+}
+
+.serial-card:hover {
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.serial-card h3 {
+  margin: 0.75rem 0 0.25rem;
+}
