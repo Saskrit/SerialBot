@@ -1,4 +1,5 @@
 {% extends "site/base.html" %}
+{% from "site/icons.html" import icon %}
 {% block title %}{{ serial.name }} — Serial Hub{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/serial.css">{% endblock %}
 {% block content %}
@@ -18,7 +19,7 @@
       {% endif %}
     </div>
     {% if bot_url %}
-    <a href="{{ bot_url }}" class="btn btn-primary" target="_blank" rel="noopener">Watch on Telegram</a>
+    <a href="{{ bot_url }}" class="btn btn-primary" target="_blank" rel="noopener">{{ icon('send', 18) }} Watch on Telegram</a>
     {% endif %}
   </div>
 
@@ -31,7 +32,7 @@
   <div class="month-grid">
     {% for m in months %}
     <a href="/serials/{{ serial.slug }}/{{ m.year }}/{{ m.month }}" class="month-card">
-      <span class="month-label">{{ format_month_year(m.year, m.month) }}</span>
+      <span class="month-label icon-inline">{{ icon('calendar', 16) }} {{ format_month_year(m.year, m.month) }}</span>
       <span class="month-count">{{ m.count }} ep{% if m.count != 1 %}s{% endif %}</span>
     </a>
     {% endfor %}

@@ -1,8 +1,8 @@
 /* Home page */
 
 .hero {
-  background: var(--sky);
-  border-bottom: 1px solid var(--border);
+  background: var(--navy);
+  color: var(--cream);
   padding: 3.5rem 0 4rem;
   margin-bottom: 0;
 }
@@ -15,13 +15,16 @@
 }
 
 .hero-badge {
-  display: inline-block;
-  background: var(--surface);
-  padding: 0.35rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(243, 228, 201, 0.12);
+  border: 1px solid rgba(243, 228, 201, 0.2);
+  padding: 0.4rem 0.9rem;
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--sage);
   margin-bottom: 1rem;
 }
 
@@ -31,13 +34,24 @@
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.1;
+  color: var(--cream);
 }
 
 .hero-copy p {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
+  font-size: 1.08rem;
+  color: rgba(243, 228, 201, 0.8);
   max-width: 480px;
   margin: 0 0 1.5rem;
+}
+
+.hero .btn-outline {
+  border-color: var(--sage);
+  color: var(--cream);
+}
+
+.hero .btn-outline:hover {
+  background: var(--cream);
+  color: var(--navy);
 }
 
 .hero-actions {
@@ -53,6 +67,7 @@
 
 .stat-card {
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.25rem 1.5rem;
   box-shadow: var(--shadow-lg);
@@ -60,13 +75,26 @@
 }
 
 .stat-card.accent {
-  background: var(--mint);
+  background: var(--sage);
+  border-color: transparent;
+}
+
+.stat-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  color: var(--bronze);
+}
+
+.stat-card.accent .stat-icon {
+  color: var(--navy);
 }
 
 .stat-num {
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: -0.03em;
+  color: var(--navy);
 }
 
 .stat-label {
@@ -93,6 +121,7 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 800;
+  color: var(--navy);
 }
 
 .section-head p {
@@ -103,6 +132,12 @@
 .link-more {
   font-weight: 700;
   font-size: 0.92rem;
+  color: var(--bronze);
+  text-decoration: none;
+}
+
+.link-more:hover {
+  color: var(--bronze-hover);
 }
 
 .serial-card {
@@ -120,22 +155,18 @@
 .serial-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-lg);
-  border-color: var(--lavender);
+  border-color: var(--bronze);
   text-decoration: none;
 }
 
 .serial-card h3 {
   margin: 0.75rem 0 0.25rem;
   font-size: 1.1rem;
+  color: var(--navy);
 }
 
 .serial-card-top {
   min-height: 1.5rem;
-}
-
-.badge-mint {
-  background: var(--mint);
-  color: #2d6b3e;
 }
 
 .steps {
@@ -152,13 +183,12 @@
   box-shadow: var(--shadow);
 }
 
-.step-num {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 50%;
-  background: var(--lavender);
-  color: #fff;
-  font-weight: 800;
+.step-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--sage);
+  color: var(--navy);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,6 +198,7 @@
 .step-card h3 {
   margin: 0 0 0.35rem;
   font-size: 1.05rem;
+  color: var(--navy);
 }
 
 .step-card p {
@@ -181,8 +212,8 @@
 }
 
 .cta-inner {
-  background: var(--lavender);
-  color: #fff;
+  background: var(--bronze);
+  color: var(--cream);
   border-radius: var(--radius);
   padding: 2.5rem 2rem;
   text-align: center;
@@ -197,10 +228,6 @@
 .cta-inner p {
   margin: 0 0 1.25rem;
   opacity: 0.92;
-}
-
-.cta-inner .btn-secondary {
-  background: var(--surface);
 }
 
 @media (max-width: 900px) {

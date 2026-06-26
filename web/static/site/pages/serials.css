@@ -9,20 +9,17 @@
   text-decoration: none;
   color: inherit;
   box-shadow: var(--shadow);
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
 
 .serial-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+  border-color: var(--bronze);
   text-decoration: none;
 }
 
 .serial-card h3 {
   margin: 0.75rem 0 0.25rem;
-}
-
-.badge-mint {
-  background: var(--mint);
-  color: #2d6b3e;
+  color: var(--navy);
 }

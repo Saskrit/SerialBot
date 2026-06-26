@@ -1,4 +1,5 @@
 {% extends "site/base.html" %}
+{% from "site/icons.html" import icon %}
 {% block title %}{{ serial.name }} — {{ format_month_year(year, month) }}{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/episodes.css">{% endblock %}
 {% block content %}
@@ -17,9 +18,9 @@
   </div>
 
   <div class="watch-note card">
-    <strong>📱 Watch on Telegram</strong>
+    <strong class="icon-inline">{{ icon('smartphone', 18) }} Watch on Telegram</strong>
     <p class="muted" style="margin:0.35rem 0 0">Episodes play in the Serial Hub bot. Open Telegram, search for this serial, and tap the date to watch.</p>
-    {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-primary btn-sm" style="margin-top:0.75rem" target="_blank" rel="noopener">Open bot</a>{% endif %}
+    {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-primary btn-sm" style="margin-top:0.75rem" target="_blank" rel="noopener">{{ icon('send', 16) }} Open bot</a>{% endif %}
   </div>
 
   {% if episodes %}
@@ -27,11 +28,11 @@
     {% for ep in episodes %}
     <div class="episode-row card">
       <div>
-        <div class="episode-date">{{ format_date(ep.date) }}</div>
-        {% if ep.view_count %}<span class="badge badge-sky">{{ ep.view_count }} views</span>{% endif %}
+        <div class="episode-date icon-inline">{{ icon('calendar', 16) }} {{ format_date(ep.date) }}</div>
+        {% if ep.view_count %}<span class="badge badge-sage">{{ icon('eye', 12) }} {{ ep.view_count }}</span>{% endif %}
       </div>
       {% if bot_url %}
-      <a href="{{ bot_url }}" class="btn btn-outline btn-sm" target="_blank" rel="noopener">Watch</a>
+      <a href="{{ bot_url }}" class="btn btn-outline btn-sm" target="_blank" rel="noopener">{{ icon('play', 16) }} Watch</a>
       {% endif %}
     </div>
     {% endfor %}
@@ -39,9 +40,9 @@
 
   {% if total_pages > 1 %}
   <div class="pagination">
-    {% if page > 0 %}<a href="?page={{ page - 1 }}" class="btn btn-outline btn-sm">← Prev</a>{% endif %}
+    {% if page > 0 %}<a href="?page={{ page - 1 }}" class="btn btn-outline btn-sm">Prev</a>{% endif %}
     <span class="muted">Page {{ page + 1 }} of {{ total_pages }}</span>
-    {% if page + 1 < total_pages %}<a href="?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next →</a>{% endif %}
+    {% if page + 1 < total_pages %}<a href="?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next</a>{% endif %}
   </div>
   {% endif %}
   {% else %}

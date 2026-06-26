@@ -2,8 +2,12 @@
 
 .watch-note {
   margin-bottom: 1.5rem;
-  background: var(--sky);
-  border-color: rgba(174, 226, 255, 0.8);
+  background: var(--sage);
+  border-color: rgba(10, 41, 71, 0.1);
+}
+
+.watch-note strong {
+  color: var(--navy);
 }
 
 .episode-list {
@@ -23,6 +27,8 @@
 .episode-date {
   font-weight: 700;
   font-size: 1.02rem;
+  color: var(--navy);
+  margin-bottom: 0.35rem;
 }
 
 .breadcrumb {
@@ -33,5 +39,6 @@
 
 .breadcrumb a {
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--bronze);
+  text-decoration: none;
 }

@@ -1,4 +1,5 @@
 {% extends "site/base.html" %}
+{% from "site/icons.html" import icon %}
 {% block title %}Search — Serial Hub{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/search.css">{% endblock %}
 {% block content %}
@@ -10,7 +11,7 @@
 
   <form class="search-bar" method="get" action="/search">
     <input type="search" name="q" value="{{ query }}" placeholder="e.g. Laughter Chef 3" autofocus>
-    <button type="submit" class="btn btn-primary">Search</button>
+    <button type="submit" class="btn btn-primary">{{ icon('search', 18) }} Search</button>
   </form>
 
   {% if query %}
@@ -21,7 +22,7 @@
     {% for s in results %}
     <a href="/serials/{{ s.slug }}" class="serial-card">
       <div class="serial-card-top">
-        <span class="badge badge-lavender">{{ s.episode_count }} eps</span>
+        <span class="badge badge-bronze">{{ icon('film', 12) }} {{ s.episode_count }} eps</span>
       </div>
       <h3>{{ s.name }}</h3>
       <p class="muted">{{ s.slug }}</p>

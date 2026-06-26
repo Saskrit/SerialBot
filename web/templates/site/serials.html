@@ -1,4 +1,5 @@
 {% extends "site/base.html" %}
+{% from "site/icons.html" import icon %}
 {% block title %}Browse Serials — Serial Hub{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/serials.css">{% endblock %}
 {% block content %}
@@ -14,9 +15,9 @@
     <a href="/serials/{{ s.slug }}" class="serial-card">
       <div class="serial-card-top">
         {% if s.episode_count > 0 %}
-        <span class="badge badge-mint">{{ s.episode_count }} episode{% if s.episode_count != 1 %}s{% endif %}</span>
+        <span class="badge badge-bronze">{{ icon('film', 12) }} {{ s.episode_count }} episode{% if s.episode_count != 1 %}s{% endif %}</span>
         {% else %}
-        <span class="badge">Coming soon</span>
+        <span class="badge badge-cream">Coming soon</span>
         {% endif %}
       </div>
       <h3>{{ s.name }}</h3>
@@ -27,9 +28,9 @@
 
   {% if total_pages > 1 %}
   <div class="pagination">
-    {% if page > 0 %}<a href="/serials?page={{ page - 1 }}" class="btn btn-outline btn-sm">← Prev</a>{% endif %}
+    {% if page > 0 %}<a href="/serials?page={{ page - 1 }}" class="btn btn-outline btn-sm">Prev</a>{% endif %}
     <span class="muted">Page {{ page + 1 }} of {{ total_pages }}</span>
-    {% if page + 1 < total_pages %}<a href="/serials?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next →</a>{% endif %}
+    {% if page + 1 < total_pages %}<a href="/serials?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next</a>{% endif %}
   </div>
   {% endif %}
   {% else %}

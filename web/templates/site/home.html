@@ -1,28 +1,32 @@
 {% extends "site/base.html" %}
+{% from "site/icons.html" import icon %}
 {% block title %}Serial Hub — Watch Serials on Telegram{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/home.css">{% endblock %}
 {% block content %}
 <section class="hero">
   <div class="container hero-inner">
     <div class="hero-copy">
-      <span class="hero-badge">📺 Daily serials · On Telegram</span>
+      <span class="hero-badge icon-inline">{{ icon('tv', 16) }} Daily serials · On Telegram</span>
       <h1>Your serials.<br>One tap away.</h1>
       <p>Browse episodes, pick your show, and watch instantly in our Telegram bot — free tier, VIP, and referrals included.</p>
       <div class="hero-actions">
-        {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-primary" target="_blank" rel="noopener">Start watching</a>{% endif %}
-        <a href="/serials" class="btn btn-outline">Browse serials</a>
+        {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-primary" target="_blank" rel="noopener">{{ icon('send', 18) }} Start watching</a>{% endif %}
+        <a href="/serials" class="btn btn-outline">{{ icon('grid', 18) }} Browse serials</a>
       </div>
     </div>
     <div class="hero-stats">
       <div class="stat-card">
+        <div class="stat-icon">{{ icon('layers', 22) }}</div>
         <div class="stat-num">{{ serial_count }}</div>
         <div class="stat-label">Serials</div>
       </div>
       <div class="stat-card">
+        <div class="stat-icon">{{ icon('film', 22) }}</div>
         <div class="stat-num">{{ episode_count }}</div>
         <div class="stat-label">Episodes</div>
       </div>
       <div class="stat-card accent">
+        <div class="stat-icon">{{ icon('check', 22) }}</div>
         <div class="stat-num">Free</div>
         <div class="stat-label">{{ free_limit_label }}</div>
       </div>
@@ -37,17 +41,17 @@
   </div>
   <div class="steps">
     <div class="step-card">
-      <div class="step-num">1</div>
+      <div class="step-icon">{{ icon('send', 24) }}</div>
       <h3>Open the bot</h3>
       <p>Start Serial Hub on Telegram and say hi.</p>
     </div>
     <div class="step-card">
-      <div class="step-num">2</div>
+      <div class="step-icon">{{ icon('search', 24) }}</div>
       <h3>Find a serial</h3>
       <p>Search by name or browse the catalog here on the web.</p>
     </div>
     <div class="step-card">
-      <div class="step-num">3</div>
+      <div class="step-icon">{{ icon('play', 24) }}</div>
       <h3>Watch episodes</h3>
       <p>Episodes are sent to your private chat — tap and enjoy.</p>
     </div>
@@ -58,13 +62,13 @@
 <section class="container section">
   <div class="section-head">
     <h2>Popular serials</h2>
-    <a href="/serials" class="link-more">View all →</a>
+    <a href="/serials" class="link-more icon-inline">{{ icon('chevron-right', 16) }} View all</a>
   </div>
   <div class="card-grid">
     {% for s in featured %}
     <a href="/serials/{{ s.slug }}" class="serial-card">
       <div class="serial-card-top">
-        <span class="badge badge-lavender">{{ s.episode_count }} eps</span>
+        <span class="badge badge-bronze">{{ icon('film', 12) }} {{ s.episode_count }} eps</span>
       </div>
       <h3>{{ s.name }}</h3>
       <p class="muted">{{ s.slug }}</p>
@@ -79,8 +83,8 @@
     <h2>Ready for unlimited access?</h2>
     <p>Contact {{ payment_contact }} for VIP membership or episode unlocks.</p>
     <div class="hero-actions">
-      <a href="/plan" class="btn btn-secondary">See plans</a>
-      <a href="{{ payment_contact_url }}" class="btn btn-primary" target="_blank" rel="noopener">Contact {{ payment_contact }}</a>
+      <a href="/plan" class="btn btn-secondary">{{ icon('crown', 18) }} See plans</a>
+      <a href="{{ payment_contact_url }}" class="btn btn-ghost-light" target="_blank" rel="noopener">{{ icon('message', 18) }} Contact {{ payment_contact }}</a>
     </div>
   </div>
 </section>

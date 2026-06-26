@@ -1,4 +1,5 @@
 {% extends "site/base.html" %}
+{% from "site/icons.html" import icon %}
 {% block title %}VIP Plan — Serial Hub{% endblock %}
 {% block page_css %}<link rel="stylesheet" href="/static/pages/plan.css">{% endblock %}
 {% block content %}
@@ -10,7 +11,7 @@
 
   <div class="plan-grid">
     <div class="plan-card card">
-      <span class="plan-tag">Free</span>
+      <span class="plan-tag icon-inline">{{ icon('check', 14) }} Free</span>
       <h2>Free tier</h2>
       <p class="plan-price">{{ free_limit_label }}</p>
       <ul>
@@ -18,11 +19,11 @@
         <li>Refer friends for bonus watches</li>
         <li>Episode unlocks available</li>
       </ul>
-      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-outline" target="_blank" rel="noopener">Get started</a>{% endif %}
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-outline" target="_blank" rel="noopener">{{ icon('send', 16) }} Get started</a>{% endif %}
     </div>
 
     <div class="plan-card card featured">
-      <span class="plan-tag">VIP</span>
+      <span class="plan-tag icon-inline">{{ icon('crown', 14) }} VIP</span>
       <h2>VIP membership</h2>
       <p class="plan-price">Unlimited daily</p>
       <ul>
@@ -31,11 +32,11 @@
         <li>Episode request priority</li>
         <li>Priority support</li>
       </ul>
-      <a href="{{ payment_contact_url }}" class="btn btn-primary" target="_blank" rel="noopener">Contact {{ payment_contact }}</a>
+      <a href="{{ payment_contact_url }}" class="btn btn-primary" target="_blank" rel="noopener">{{ icon('message', 16) }} Contact {{ payment_contact }}</a>
     </div>
 
     <div class="plan-card card">
-      <span class="plan-tag">Refer</span>
+      <span class="plan-tag icon-inline">{{ icon('gift', 14) }} Refer</span>
       <h2>Refer &amp; watch</h2>
       <p class="plan-price">+5 watches / invite</p>
       <ul>
@@ -43,14 +44,14 @@
         <li>Earn bonus watches per friend</li>
         <li>Each friend can only join once</li>
       </ul>
-      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-secondary" target="_blank" rel="noopener">Open bot → Refer</a>{% endif %}
+      {% if bot_url %}<a href="{{ bot_url }}" class="btn btn-secondary" target="_blank" rel="noopener">{{ icon('users', 16) }} Open bot</a>{% endif %}
     </div>
   </div>
 
   <div class="payment-note card">
-    <h3>Payment &amp; unlocks</h3>
+    <h3 class="icon-inline">{{ icon('message', 20) }} Payment &amp; unlocks</h3>
     <p>All payments and VIP upgrades are handled by <strong>{{ payment_contact }}</strong> on Telegram. Message them with your Telegram ID after opening the bot.</p>
-    <a href="{{ payment_contact_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">Message {{ payment_contact }}</a>
+    <a href="{{ payment_contact_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">{{ icon('send', 16) }} Message {{ payment_contact }}</a>
   </div>
 </div>
 {% endblock %}
