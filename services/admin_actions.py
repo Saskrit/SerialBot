@@ -80,6 +80,19 @@ async def grant_vip_with_notify(bot: Bot, telegram_id: int, days: int = 30) -> d
     return expires
 
 
+async def revoke_vip_with_notify(bot: Bot, telegram_id: int) -> bool:
+    removed = await repo.revoke_vip(telegram_id)
+    if removed:
+        await notify_user(
+            bot,
+            telegram_id,
+            "Your VIP membership has been removed.\n"
+            "You are now on the free tier. Contact support if you have questions.",
+            parse_mode=None,
+        )
+    return removed
+
+
 async def broadcast_message(bot: Bot, text: str) -> tuple[int, int]:
     user_ids = await repo.get_all_user_ids()
     sent = 0

@@ -42,6 +42,13 @@
       <button type="submit" class="btn btn-primary">Grant VIP</button>
     </form>
 
+    {% if user.plan == 'vip' %}
+    <form method="post" action="/admin/users/{{ user.telegram_id }}/revoke-vip" class="inline-form" onsubmit="return confirm('Remove VIP access for this user?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn-danger">Remove VIP</button>
+    </form>
+    {% endif %}
+
     <form method="post" action="/admin/users/{{ user.telegram_id }}/unlock" class="inline-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Unlock episode <input type="text" name="episode_id" placeholder="Episode ObjectId" required></label>

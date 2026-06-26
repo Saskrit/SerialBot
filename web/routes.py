@@ -277,6 +277,23 @@ async def user_grant_vip(request: web.Request) -> web.Response:
 
 
 @require_admin
+async def user_revoke_vip(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        bot = _create_bot(req)
+        try:
+            removed = await admin_actions.revoke_vip_with_notify(bot, telegram_id)
+        finally:
+            await bot.session.close()
+        if removed:
+            _redirect(f"/admin/users/{telegram_id}", "VIP access removed.")
+        else:
+            _redirect(f"/admin/users/{telegram_id}", "User is not a VIP member.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
 async def user_delete(request: web.Request) -> web.Response:
     async def action(req: web.Request) -> web.Response:
         telegram_id = int(req.match_info["telegram_id"])
@@ -829,6 +846,7 @@ def setup_admin_routes(app: web.Application, create_bot) -> None:
     app.router.add_post("/admin/users/{telegram_id:\\d+}/ban", user_ban)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/unban", user_unban)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/vip", user_grant_vip)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/revoke-vip", user_revoke_vip)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/unlock", user_grant_unlock)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/delete", user_delete)
     app.router.add_get("/admin/payments", payments_list)

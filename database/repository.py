@@ -304,6 +304,22 @@ async def grant_vip(
     return expires
 
 
+async def revoke_vip(telegram_id: int) -> bool:
+    db = get_db()
+    result = await db.users.update_one(
+        {"telegram_id": telegram_id, "plan": "vip"},
+        {
+            "$set": {
+                "plan": "free",
+                "vip_expires": None,
+                "membership_tier": None,
+                "last_active": datetime.now(TZ),
+            }
+        },
+    )
+    return result.modified_count > 0
+
+
 async def grant_daily_pass(telegram_id: int, *, hours: int = 24) -> datetime:
     now = datetime.now(TZ)
     db = get_db()

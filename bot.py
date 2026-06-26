@@ -11,7 +11,7 @@ from config import RESTART_DELAY_SEC, TELEGRAM_PROXY, validate_config
 from database.connection import close_db, init_db
 from handlers import setup_routers
 from middlewares.logging import UpdateLoggingMiddleware
-from middlewares.private_chat import PrivateChatOnlyMiddleware
+from middlewares.group_chat import GroupChatMiddleware
 from middlewares.registration import UserRegistrationMiddleware
 
 logging.basicConfig(
@@ -122,8 +122,8 @@ async def run_once() -> None:
 
     dp = Dispatcher()
     dp.update.middleware(UpdateLoggingMiddleware())
-    dp.message.middleware(PrivateChatOnlyMiddleware())
-    dp.callback_query.middleware(PrivateChatOnlyMiddleware())
+    dp.message.middleware(GroupChatMiddleware())
+    dp.callback_query.middleware(GroupChatMiddleware())
     dp.message.middleware(UserRegistrationMiddleware())
     dp.callback_query.middleware(UserRegistrationMiddleware())
     dp.include_router(setup_routers())

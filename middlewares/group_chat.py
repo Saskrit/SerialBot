@@ -6,6 +6,7 @@ from aiogram.enums import ChatType
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from config import STORAGE_CHANNEL_IDS
+from services.chat_scope import is_relevant_group_message_text
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,11 @@ def _chat_from_event(event: TelegramObject):
     return None
 
 
-class PrivateChatOnlyMiddleware(BaseMiddleware):
-    """Drop user-facing updates from normal group chats.
+class GroupChatMiddleware(BaseMiddleware):
+    """Private chats: full bot. Groups: only serial/date/greeting/status/commands.
 
-    The bot should only interact in private DMs (and configured storage
-    channels). This keeps group conversations between members uninterrupted.
+    Random group conversation is ignored so members can chat normally.
+    Inline button taps in groups are always allowed (user already engaged the bot).
     """
 
     async def __call__(
@@ -40,5 +41,14 @@ class PrivateChatOnlyMiddleware(BaseMiddleware):
 
         if chat.id in STORAGE_CHANNEL_IDS:
             return await handler(event, data)
+
+        if isinstance(event, CallbackQuery):
+            return await handler(event, data)
+
+        if isinstance(event, Message):
+            text = event.text
+            if text and await is_relevant_group_message_text(text):
+                return await handler(event, data)
+            return None
 
         return None

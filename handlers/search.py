@@ -1,9 +1,11 @@
 from aiogram import F, Router
+from aiogram.enums import ChatType
 from aiogram.filters import StateFilter
 from aiogram.types import CallbackQuery, Message
 
 from database import repository as repo
 from keyboards.inline import date_episodes_keyboard
+from services.chat_scope import BOT_MENU_BUTTONS
 from services.date_query import (
     UserDateQuery,
     decode_date_query,
@@ -17,16 +19,7 @@ from services.serial_matcher import match_serial
 
 router = Router()
 
-MENU_BUTTONS = {
-    "🔍 Search Serial",
-    "📚 Browse Serials",
-    "📋 My Plan",
-    "⭐ Get VIP",
-    "✅ VIP Member",
-    "📺 Request Episode",
-    "💬 Support",
-    "❌ Close Menu",
-}
+MENU_BUTTONS = BOT_MENU_BUTTONS
 
 
 async def _send_date_episodes(
@@ -63,6 +56,8 @@ async def serial_search(message: Message, db_user: dict):
 
     serial = await match_serial(message.text)
     if not serial:
+        if message.chat.type != ChatType.PRIVATE:
+            return
         serials = await repo.list_serials()
         sample = ", ".join(s["name"] for s in serials[:6])
         await message.answer(
