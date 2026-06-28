@@ -144,9 +144,6 @@ async def build_status_text(user: dict, *, is_admin: bool = False) -> str:
             ]
         )
 
-    if is_admin:
-        lines.append("\n🛠 <b>Admin:</b> /admin in Telegram · web panel at <code>/admin</code>")
-
     return "\n".join(lines)
 
 async def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
@@ -197,9 +194,6 @@ async def build_user_info_text(user: dict, *, is_admin: bool = False) -> str:
             "🔍 Type a serial name to start watching.",
         ]
     )
-
-    if is_admin:
-        lines.append("\n🛠 <b>Admin:</b> /admin in Telegram · web panel at <code>/admin</code>")
 
     return "\n".join(lines)
 

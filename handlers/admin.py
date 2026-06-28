@@ -739,13 +739,33 @@ async def admin_delete_episode_execute(callback: CallbackQuery):
 
 
 @router.message(Command("admin"))
-async def admin_panel(message: Message):
-    if not is_admin(message.from_user.id):
+async def admin_panel(message: Message, db_user: dict | None = None):
+    if is_admin(message.from_user.id):
+        await message.answer(
+            "🛠 <b>Admin Panel</b>",
+            reply_markup=admin_menu_keyboard(),
+            parse_mode="HTML",
+        )
         return
+
+    if db_user and db_user.get("banned"):
+        await message.answer("🚫 Your account is suspended.")
+        return
+
+    attempts = await repo.increment_admin_command_attempts(message.from_user.id)
+    if attempts >= 2:
+        await repo.set_banned(message.from_user.id, True)
+        await message.answer(
+            "🚫 <b>Account banned</b>\n\n"
+            "Repeated unauthorized use of <code>/admin</code>.",
+            parse_mode="HTML",
+        )
+        return
+
     await message.answer(
-        "🛠 <b>Admin Panel</b>\n\n"
-        "Web dashboard: open <code>/admin</code> on your Railway app URL.",
-        reply_markup=admin_menu_keyboard(),
+        "⚠️ <b>Unauthorized</b>\n\n"
+        "This command is for administrators only.\n"
+        "If you try <code>/admin</code> again, your account will be <b>banned</b>.",
         parse_mode="HTML",
     )
 

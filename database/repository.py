@@ -59,6 +59,7 @@ async def get_or_create_user(
         "notify_expires": None,
         "notify_serials": [],
         "last_notify_promo_at": None,
+        "admin_command_attempts": 0,
         "unlocked_episodes": [],
         "trial_episodes": [],
         "banned": False,
@@ -723,6 +724,17 @@ async def set_banned(telegram_id: int, banned: bool) -> bool:
         {"$set": {"banned": banned}},
     )
     return result.matched_count > 0
+
+
+async def increment_admin_command_attempts(telegram_id: int) -> int:
+    doc = await get_db().users.find_one_and_update(
+        {"telegram_id": telegram_id},
+        {"$inc": {"admin_command_attempts": 1}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not doc:
+        return 1
+    return int(doc.get("admin_command_attempts", 1))
 
 
 async def delete_user(telegram_id: int) -> bool:
