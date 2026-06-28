@@ -93,6 +93,36 @@ async def revoke_vip_with_notify(bot: Bot, telegram_id: int) -> bool:
     return removed
 
 
+async def grant_notify_with_notify(
+    bot: Bot, telegram_id: int, plan_id: str, *, days: int = 30
+) -> datetime:
+    from services.notify_membership import get_notify_plan
+
+    expires = await repo.grant_notify_membership(telegram_id, plan_id, days=days)
+    plan = get_notify_plan(plan_id)
+    name = plan.name if plan else "Episode Alerts"
+    await notify_user(
+        bot,
+        telegram_id,
+        f"🔔 <b>{name} activated!</b>\n\n"
+        f"Valid until <b>{format_date(expires)}</b>.\n"
+        "Open <b>🔔 Episode Alerts</b> in the menu to pick your serials.",
+    )
+    return expires
+
+
+async def revoke_notify_with_notify(bot: Bot, telegram_id: int) -> bool:
+    removed = await repo.revoke_notify_membership(telegram_id)
+    if removed:
+        await notify_user(
+            bot,
+            telegram_id,
+            "Your Episode Alert membership has been removed.",
+            parse_mode=None,
+        )
+    return removed
+
+
 async def broadcast_message(bot: Bot, text: str) -> tuple[int, int]:
     user_ids = await repo.get_all_user_ids()
     sent = 0

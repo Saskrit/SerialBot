@@ -55,6 +55,10 @@ async def get_or_create_user(
         "referral_count": 0,
         "referred_by": None,
         "referred_at": None,
+        "notify_plan": None,
+        "notify_expires": None,
+        "notify_serials": [],
+        "last_notify_promo_at": None,
         "unlocked_episodes": [],
         "trial_episodes": [],
         "banned": False,
@@ -109,6 +113,13 @@ async def _check_vip_expiry(user: dict[str, Any]) -> dict[str, Any]:
     if daily_expires and daily_expires < now:
         updates["daily_pass_expires"] = None
         user["daily_pass_expires"] = None
+
+    notify_expires = ensure_aware(user.get("notify_expires"))
+    if user.get("notify_plan") and notify_expires and notify_expires < now:
+        updates["notify_plan"] = None
+        updates["notify_expires"] = None
+        user["notify_plan"] = None
+        user["notify_expires"] = None
 
     if updates:
         await get_db().users.update_one(
@@ -352,6 +363,181 @@ async def grant_daily_pass(telegram_id: int, *, hours: int = 24) -> datetime:
         upsert=True,
     )
     return expires
+
+
+def has_active_notify_membership(user: dict[str, Any]) -> bool:
+    from services.notify_membership import get_notify_plan
+
+    plan_id = user.get("notify_plan")
+    if not plan_id or not get_notify_plan(plan_id):
+        return False
+    expires = ensure_aware(user.get("notify_expires"))
+    if not expires:
+        return False
+    return expires > datetime.now(TZ)
+
+
+def notify_covers_serial(user: dict[str, Any], serial_slug: str) -> bool:
+    from services.notify_membership import get_notify_plan
+
+    if not has_active_notify_membership(user):
+        return False
+    plan = get_notify_plan(user.get("notify_plan"))
+    if not plan:
+        return False
+    if plan.serial_limit is None:
+        return True
+    return serial_slug in (user.get("notify_serials") or [])
+
+
+async def grant_notify_membership(
+    telegram_id: int, plan_id: str, *, days: int = 30
+) -> datetime:
+    from services.notify_membership import get_notify_plan
+
+    plan = get_notify_plan(plan_id)
+    if not plan:
+        raise ValueError(f"Unknown notify plan: {plan_id}")
+
+    now = datetime.now(TZ)
+    db = get_db()
+    user = await db.users.find_one({"telegram_id": telegram_id})
+    base = now
+    if user:
+        user = normalize_user_datetimes(await _normalize_daily_usage(user))
+        current = ensure_aware(user.get("notify_expires"))
+        if current and current > now and user.get("notify_plan") == plan_id:
+            base = current
+    expires = base + timedelta(days=days)
+    update: dict[str, Any] = {
+        "notify_plan": plan_id,
+        "notify_expires": expires,
+        "last_active": now,
+    }
+    if plan.serial_limit is None:
+        update["notify_serials"] = []
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": update},
+        upsert=True,
+    )
+    return expires
+
+
+async def revoke_notify_membership(telegram_id: int) -> bool:
+    result = await get_db().users.update_one(
+        {"telegram_id": telegram_id, "notify_plan": {"$ne": None}},
+        {
+            "$set": {
+                "notify_plan": None,
+                "notify_expires": None,
+                "notify_serials": [],
+                "last_active": datetime.now(TZ),
+            }
+        },
+    )
+    return result.modified_count > 0
+
+
+async def set_notify_serials(telegram_id: int, slugs: list[str]) -> tuple[bool, str]:
+    from services.notify_membership import get_notify_plan
+
+    user = await get_user(telegram_id)
+    if not user or not has_active_notify_membership(user):
+        return False, "no_membership"
+    plan = get_notify_plan(user.get("notify_plan"))
+    if not plan or plan.serial_limit is None:
+        return False, "all_serials"
+    cleaned = list(dict.fromkeys(s.strip() for s in slugs if s and s.strip()))
+    if len(cleaned) > plan.serial_limit:
+        return False, "over_limit"
+    active = await list_serials()
+    valid_slugs = {s["slug"] for s in active}
+    cleaned = [s for s in cleaned if s in valid_slugs]
+    await get_db().users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"notify_serials": cleaned}},
+    )
+    return True, "ok"
+
+
+async def toggle_notify_serial(telegram_id: int, serial_slug: str) -> tuple[bool, str]:
+    from services.notify_membership import get_notify_plan
+
+    user = await get_user(telegram_id)
+    if not user or not has_active_notify_membership(user):
+        return False, "no_membership"
+    plan = get_notify_plan(user.get("notify_plan"))
+    if not plan or plan.serial_limit is None:
+        return False, "all_serials"
+    serial = await get_serial_by_slug(serial_slug)
+    if not serial:
+        return False, "invalid_serial"
+    current = list(user.get("notify_serials") or [])
+    if serial_slug in current:
+        current.remove(serial_slug)
+    else:
+        if len(current) >= plan.serial_limit:
+            return False, "limit_reached"
+        current.append(serial_slug)
+    await get_db().users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"notify_serials": current}},
+    )
+    return True, "ok"
+
+
+async def get_notify_subscribers_for_serial(serial_slug: str) -> list[int]:
+    now = datetime.now(TZ)
+    db = get_db()
+    cursor = db.users.find(
+        {
+            "banned": {"$ne": True},
+            "notify_plan": {"$in": ["notify_10", "notify_20", "notify_all"]},
+            "notify_expires": {"$gt": now},
+            "$or": [
+                {"notify_plan": "notify_all"},
+                {"notify_serials": serial_slug},
+            ],
+        },
+        {"telegram_id": 1},
+    )
+    return [doc["telegram_id"] async for doc in cursor]
+
+
+async def get_users_without_notify_membership() -> list[int]:
+    now = datetime.now(TZ)
+    cursor = get_db().users.find(
+        {
+            "banned": {"$ne": True},
+            "$or": [
+                {"notify_plan": None},
+                {"notify_plan": {"$exists": False}},
+                {"notify_expires": {"$lte": now}},
+                {"notify_expires": None},
+            ],
+        },
+        {"telegram_id": 1},
+    )
+    return [doc["telegram_id"] async for doc in cursor]
+
+
+async def mark_notify_promo_sent(telegram_id: int) -> None:
+    await get_db().users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"last_notify_promo_at": datetime.now(TZ)}},
+    )
+
+
+async def count_notify_subscribers() -> int:
+    now = datetime.now(TZ)
+    return await get_db().users.count_documents(
+        {
+            "banned": {"$ne": True},
+            "notify_plan": {"$in": ["notify_10", "notify_20", "notify_all"]},
+            "notify_expires": {"$gt": now},
+        }
+    )
 
 
 async def grant_episode_unlock(telegram_id: int, episode_id: str) -> None:

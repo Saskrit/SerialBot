@@ -46,6 +46,27 @@
   </div>
 
   <div class="plan-section">
+    <h2 class="section-label">Episode alerts (monthly)</h2>
+    <p class="muted" style="margin:-0.5rem 0 1rem">Get notified when new episodes upload for serials you choose. Contact {{ payment_contact }} in Telegram to subscribe.</p>
+    <div class="plan-grid plan-grid-2">
+      {% for plan in notify_plans %}
+      <div class="plan-card card">
+        <span class="plan-tag icon-inline">{{ icon('smartphone', 14) }} Alerts</span>
+        <h3>{{ plan.name }}</h3>
+        <p class="plan-price">{{ plan.price_label }}</p>
+        <p class="plan-validity">{{ plan.validity }}</p>
+        <ul>
+          {% for benefit in plan.benefits %}
+          <li>{{ benefit }}</li>
+          {% endfor %}
+        </ul>
+        <a href="{{ payment_contact_url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">{{ icon('message', 16) }} Contact {{ payment_contact }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="plan-section">
     <h2 class="section-label">VIP subscriptions</h2>
     <div class="plan-grid">
       {% for plan in vip_plans %}

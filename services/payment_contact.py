@@ -2,6 +2,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import PAYMENT_CONTACT_USERNAME
 from services.membership import MembershipPlan, get_plan
+from services.notify_membership import get_notify_plan
 
 
 def payment_contact_url() -> str:
@@ -64,6 +65,24 @@ def build_payment_contact_text(
             return build_plan_payment_text(
                 plan, telegram_id=telegram_id, episode_id=episode_id
             )
+        notify_plan = get_notify_plan(plan_id)
+        if notify_plan:
+            lines = [
+                "💳 <b>Episode Alert Membership</b>",
+                "",
+                f"<b>{notify_plan.name}</b> · {notify_plan.price_label}",
+                f"Validity: {notify_plan.validity}",
+                "",
+                f"Contact <b>{payment_contact_label()}</b> on Telegram to subscribe.",
+            ]
+            if telegram_id is not None:
+                lines.extend(
+                    [
+                        "",
+                        f"Your Telegram ID: <code>{telegram_id}</code>",
+                    ]
+                )
+            return "\n".join(lines)
 
     if purpose == "unlock":
         plan = get_plan("episode_pass")
@@ -82,6 +101,11 @@ def build_payment_contact_text(
         "• Monthly VIP — ₹99 ⭐ Recommended",
         "• Quarterly VIP — ₹249",
         "• Annual VIP — ₹799",
+        "",
+        "<b>Episode Alerts (monthly)</b>",
+        "• 10 serials — ₹50",
+        "• 20 serials — ₹100",
+        "• All serials — ₹150",
     ]
     if telegram_id is not None:
         lines.extend(

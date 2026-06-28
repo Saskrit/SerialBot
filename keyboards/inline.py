@@ -4,6 +4,8 @@ from config import EPISODES_PER_PAGE, PAYMENT_CONTACT_USERNAME, SERIALS_PER_PAGE
 from database import repository as repo
 from services.membership import UPGRADE_PLANS, get_plan, plan_button_text
 from services.messages import DATE_EPISODES_PER_PAGE, format_date, format_month_year
+from services.notify_membership import NOTIFY_PLANS, get_notify_plan
+from services.payment_contact import payment_contact_url
 
 CLOSE_CALLBACK = "ui:close"
 HOME_CALLBACK = "ui:home"
@@ -44,6 +46,7 @@ def main_menu_keyboard(user: dict | None = None) -> ReplyKeyboardMarkup:
                 KeyboardButton(text="💬 Support"),
             ],
             [KeyboardButton(text="🎁 Refer & Watch")],
+            [KeyboardButton(text="🔔 Episode Alerts")],
             [KeyboardButton(text="❌ Close Menu")],
         ],
         resize_keyboard=True,
@@ -369,6 +372,88 @@ def new_episode_notification_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def notify_promo_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text="🔔 Episode Alerts", callback_data="notify:menu")],
+        [
+            InlineKeyboardButton(
+                text=f"💬 Contact @{PAYMENT_CONTACT_USERNAME}",
+                url=payment_contact_url(),
+            )
+        ],
+    ]
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def notify_membership_keyboard(user: dict | None = None) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if user and repo.has_active_notify_membership(user):
+        plan = get_notify_plan(user.get("notify_plan"))
+        if plan and plan.serial_limit is not None:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text="📋 Pick serials",
+                        callback_data="notify:pick:0",
+                    )
+                ]
+            )
+    else:
+        for plan in NOTIFY_PLANS:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"{plan.name} — {plan.price_label}",
+                        callback_data=f"notify:plan:{plan.id}",
+                    )
+                ]
+            )
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"💬 Subscribe ({plan.price_label})",
+                        callback_data=f"notify:pay:{plan.id}",
+                    )
+                ]
+            )
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def notify_serial_picker_keyboard(user: dict, page: int) -> InlineKeyboardMarkup:
+    serials, total = await repo.list_serials_catalog(page, SERIALS_PER_PAGE)
+    selected = set(user.get("notify_serials") or [])
+    rows: list[list[InlineKeyboardButton]] = []
+    for serial in serials:
+        mark = "✅ " if serial["slug"] in selected else ""
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{mark}{serial['name']}",
+                    callback_data=f"notify:toggle:{serial['slug']}:{page}",
+                )
+            ]
+        )
+    total_pages = max(1, (total + SERIALS_PER_PAGE - 1) // SERIALS_PER_PAGE)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(
+            InlineKeyboardButton(text="◀ Prev", callback_data=f"notify:pick:{page - 1}")
+        )
+    if page < total_pages - 1:
+        nav.append(
+            InlineKeyboardButton(text="Next ▶", callback_data=f"notify:pick:{page + 1}")
+        )
+    if nav:
+        rows.append(nav)
+    rows.append(
+        [InlineKeyboardButton(text="🔔 Alert status", callback_data="notify:menu")]
+    )
+    append_ui_actions(rows)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def admin_free_limit_keyboard(current: int) -> InlineKeyboardMarkup:
     options = [0, 3, 4, 5, 6, 7, 8, 9, 10]
     rows: list[list[InlineKeyboardButton]] = []
@@ -433,6 +518,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📊 Statistics", callback_data="admin:stats")],
         [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
         [InlineKeyboardButton(text="🎁 Referrals", callback_data="admin:referrals:0")],
+        [InlineKeyboardButton(text="🔔 Alert promo", callback_data="admin:notifypromo")],
         [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
         [InlineKeyboardButton(text="⚙️ Free Tier Limit", callback_data="admin:freelimit")],
         [InlineKeyboardButton(text="⏳ Trial Episode Timer", callback_data="admin:trial")],

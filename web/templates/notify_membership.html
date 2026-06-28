@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Episode Alerts — Serial Hub Admin{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="/admin/static/pages/broadcast.css">{% endblock %}
+{% block content %}
+<div class="page page-notify-membership">
+<div class="page-header">
+  <div>
+    <h1>Episode Alert membership</h1>
+    <p class="subtitle">Monthly plans for upload notifications · payment via @godthough</p>
+  </div>
+</div>
+
+<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem">
+  <div class="card">
+    <div class="stat-value" style="font-size:1.75rem;font-weight:800">{{ subscriber_count }}</div>
+    <div class="stat-label">Active subscribers</div>
+  </div>
+  <div class="card">
+    <div class="stat-value" style="font-size:1.75rem;font-weight:800">{{ eligible_promo }}</div>
+    <div class="stat-label">Users without alerts (promo audience)</div>
+  </div>
+  <div class="card">
+    <div class="stat-value" style="font-size:1.75rem;font-weight:800">{{ promo_interval_hours }}h</div>
+    <div class="stat-label">Auto promo interval</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1.25rem">
+  <h2 class="card-title">Plans</h2>
+  <ul>
+    <li><strong>₹50/month</strong> — 10 serials</li>
+    <li><strong>₹100/month</strong> — 20 serials</li>
+    <li><strong>₹150/month</strong> — all serials</li>
+  </ul>
+  <p class="muted">Grant membership from a user's detail page after they pay. They pick serials in the bot via <strong>🔔 Episode Alerts</strong>.</p>
+</div>
+
+<form method="post" action="/admin/notify-membership/promo" class="card broadcast-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <h2 class="card-title">Send promo now</h2>
+  <p class="muted">Sends the standard Episode Alert membership message to all users who are not currently subscribed. Same message as the automatic every-{{ promo_interval_hours }}-hour reminder.</p>
+  <button type="submit" class="btn btn-primary" onclick="return confirm('Send alert membership promo to {{ eligible_promo }} users?');">Send promo notification</button>
+</form>
+</div>
+{% endblock %}

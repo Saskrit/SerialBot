@@ -28,6 +28,13 @@
       <dt>Unlocked episodes</dt><dd>{{ user.unlocked_episodes|length if user.unlocked_episodes else 0 }}</dd>
       <dt>Referral invites sent</dt><dd>{{ user.referral_count or 0 }}</dd>
       <dt>Bonus watches</dt><dd>{{ user.referral_watch_credits or 0 }}</dd>
+      <dt>Episode alerts</dt>
+      <dd>
+        {% if user.notify_plan and user.notify_expires %}
+        {{ user.notify_plan }} · until {{ format_date(user.notify_expires) }}
+        {% if user.notify_serials %} · {{ user.notify_serials|length }} serial(s){% endif %}
+        {% else %}—{% endif %}
+      </dd>
       <dt>Banned</dt><dd>{{ 'Yes' if user.banned else 'No' }}</dd>
       <dt>Registered</dt><dd>{% if user.registered_at %}{{ format_datetime(user.registered_at) }}{% else %}—{% endif %}</dd>
       <dt>Last active</dt><dd>{% if user.last_active %}{{ format_datetime(user.last_active) }}{% else %}—{% endif %}</dd>
@@ -46,6 +53,29 @@
     <form method="post" action="/admin/users/{{ user.telegram_id }}/revoke-vip" class="inline-form" onsubmit="return confirm('Remove VIP access for this user?');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit" class="btn btn-danger">Remove VIP</button>
+    </form>
+    {% endif %}
+
+    <form method="post" action="/admin/users/{{ user.telegram_id }}/notify" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Grant Episode Alerts
+        <select name="notify_plan">
+          <option value="notify_10">10 serials — ₹50</option>
+          <option value="notify_20">20 serials — ₹100</option>
+          <option value="notify_all">All serials — ₹150</option>
+        </select>
+      </label>
+      <label>Days <input type="number" name="days" value="30" min="1" max="365"></label>
+      <label>Serial slugs (optional, comma-separated)
+        <input type="text" name="notify_serials" placeholder="slug-one, slug-two">
+      </label>
+      <button type="submit" class="btn btn-primary">Grant alerts</button>
+    </form>
+
+    {% if user.notify_plan %}
+    <form method="post" action="/admin/users/{{ user.telegram_id }}/revoke-notify" class="inline-form" onsubmit="return confirm('Remove Episode Alert membership?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn-danger">Remove alerts</button>
     </form>
     {% endif %}
 

@@ -41,7 +41,7 @@ async def notify_users_new_episode(
         "Tap below to watch now."
     )
     keyboard = new_episode_notification_keyboard(serial_slug, episode_id)
-    user_ids = await repo.get_all_user_ids()
+    user_ids = await repo.get_notify_subscribers_for_serial(serial_slug)
 
     from config import ADMIN_IDS
 
@@ -62,10 +62,9 @@ async def notify_users_new_episode(
         await asyncio.sleep(NOTIFY_DELAY_SEC)
 
     logger.info(
-        "New episode notification: %s — %s sent to %s/%s users",
+        "New episode notification: %s — %s sent to %s subscriber(s)",
         serial_name,
         format_date(episode_date),
         sent,
-        len(user_ids),
     )
     return sent

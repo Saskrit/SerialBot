@@ -9,6 +9,7 @@ import aiohttp
 
 from database import repository as repo
 from database.connection import get_db
+from config import NOTIFY_PROMO_INTERVAL_HOURS
 from services import admin_actions
 from services.messages import format_date, format_datetime
 from services.serial_utils import parse_add_serial_input
@@ -289,6 +290,82 @@ async def user_revoke_vip(request: web.Request) -> web.Response:
             _redirect(f"/admin/users/{telegram_id}", "VIP access removed.")
         else:
             _redirect(f"/admin/users/{telegram_id}", "User is not a VIP member.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def user_grant_notify(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        post = await req.post()
+        plan_id = str(post.get("notify_plan", "")).strip()
+        days_raw = str(post.get("days", "30")).strip()
+        days = int(days_raw) if days_raw.isdigit() else 30
+        serials_raw = str(post.get("notify_serials", "")).strip()
+        bot = _create_bot(req)
+        try:
+            expires = await admin_actions.grant_notify_with_notify(
+                bot, telegram_id, plan_id, days=days
+            )
+            if serials_raw:
+                slugs = [s.strip() for s in serials_raw.replace("\n", ",").split(",") if s.strip()]
+                await repo.set_notify_serials(telegram_id, slugs)
+        finally:
+            await bot.session.close()
+        _redirect(
+            f"/admin/users/{telegram_id}",
+            f"Episode Alerts granted until {format_date(expires)}.",
+        )
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def user_revoke_notify(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        telegram_id = int(req.match_info["telegram_id"])
+        bot = _create_bot(req)
+        try:
+            removed = await admin_actions.revoke_notify_with_notify(bot, telegram_id)
+        finally:
+            await bot.session.close()
+        if removed:
+            _redirect(f"/admin/users/{telegram_id}", "Episode Alerts removed.")
+        else:
+            _redirect(f"/admin/users/{telegram_id}", "User has no alert membership.")
+
+    return await _post_action(request, action)
+
+
+@require_admin
+async def notify_membership_page(request: web.Request) -> web.Response:
+    subscriber_count = await repo.count_notify_subscribers()
+    eligible_promo = len(await repo.get_users_without_notify_membership())
+    return _html(
+        "notify_membership.html",
+        request,
+        flash=_flash_from_query(request),
+        subscriber_count=subscriber_count,
+        eligible_promo=eligible_promo,
+        promo_interval_hours=NOTIFY_PROMO_INTERVAL_HOURS,
+    )
+
+
+@require_admin
+async def notify_membership_promo_send(request: web.Request) -> web.Response:
+    async def action(req: web.Request) -> web.Response:
+        from services.notify_promo import send_notify_membership_promo
+
+        bot = _create_bot(req)
+        try:
+            sent, total = await send_notify_membership_promo(bot)
+        finally:
+            await bot.session.close()
+        _redirect(
+            "/admin/notify-membership",
+            f"Alert membership promo sent to {sent}/{total} users.",
+        )
 
     return await _post_action(request, action)
 
@@ -847,6 +924,8 @@ def setup_admin_routes(app: web.Application, create_bot) -> None:
     app.router.add_post("/admin/users/{telegram_id:\\d+}/unban", user_unban)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/vip", user_grant_vip)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/revoke-vip", user_revoke_vip)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/notify", user_grant_notify)
+    app.router.add_post("/admin/users/{telegram_id:\\d+}/revoke-notify", user_revoke_notify)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/unlock", user_grant_unlock)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/delete", user_delete)
     app.router.add_get("/admin/payments", payments_list)
@@ -875,5 +954,7 @@ def setup_admin_routes(app: web.Application, create_bot) -> None:
     app.router.add_post("/admin/support/{ticket_id}/reply", support_reply)
     app.router.add_get("/admin/broadcast", broadcast_page)
     app.router.add_post("/admin/broadcast", broadcast_send)
+    app.router.add_get("/admin/notify-membership", notify_membership_page)
+    app.router.add_post("/admin/notify-membership/promo", notify_membership_promo_send)
     app.router.add_get("/admin/static/{path:.+}", static_file)
     logger.info("Web admin panel enabled at /admin")

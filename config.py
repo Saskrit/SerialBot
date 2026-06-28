@@ -83,6 +83,9 @@ NOTIFY_ON_NEW_EPISODE = os.getenv("NOTIFY_ON_NEW_EPISODE", "true").lower() in (
     "yes",
 )
 
+NOTIFY_PROMO_INTERVAL_HOURS = int(os.getenv("NOTIFY_PROMO_INTERVAL_HOURS", "3"))
+NOTIFY_MEMBERSHIP_DAYS = 30
+
 TZ = timezone.utc
 
 

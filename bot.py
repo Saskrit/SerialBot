@@ -142,7 +142,17 @@ async def run_once() -> None:
             signal.signal(sig, lambda *_: request_shutdown())
 
     polling = asyncio.create_task(polling_loop(dp, shutdown))
+    from services.notify_promo import notify_promo_scheduler
+
+    promo = asyncio.create_task(notify_promo_scheduler(create_bot, shutdown))
     await shutdown.wait()
+
+    if not promo.done():
+        promo.cancel()
+        try:
+            await promo
+        except asyncio.CancelledError:
+            pass
 
     if not polling.done():
         await dp.stop_polling()

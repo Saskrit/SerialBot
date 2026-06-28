@@ -12,6 +12,7 @@ Telegram bot and web app for browsing and delivering daily TV serial episodes. U
 - Upgrade screen when daily limit is reached (all plans compared; Monthly VIP highlighted)
 - **My Membership** page — plan, usage, referrals, unlocks, VIP expiry
 - **Refer & Watch** — referrer and new user each get 5 bonus watches via `ref_TELEGRAM_ID` link (one referral per user)
+- **Episode Alert membership** — ₹50 (10 serials), ₹100 (20), ₹150 (all); monthly upload notifications
 - Episode requests and support tickets
 - Trial episode timer for free users (optional, set in admin)
 - Episode uploads from private storage channels
@@ -91,7 +92,8 @@ Telegram bot and web app for browsing and delivering daily TV serial episodes. U
 | `STORAGE_CHANNEL_IDS` | Yes* | Comma-separated private channel IDs where episodes are stored |
 | `STORAGE_CHANNEL_ID` | Yes* | Single channel ID (legacy; use `STORAGE_CHANNEL_IDS` for multiple) |
 | `PAYMENT_CONTACT_USERNAME` | No | Telegram username for VIP / payment contact (default: `godthough`) |
-| `NOTIFY_ON_NEW_EPISODE` | No | Notify users when new episodes are added (`true` / `false`) |
+| `NOTIFY_ON_NEW_EPISODE` | No | Send upload alerts to Episode Alert subscribers (`true` / `false`) |
+| `NOTIFY_PROMO_INTERVAL_HOURS` | No | Hours between auto promos for alert membership (default: `3`) |
 | `TELEGRAM_PROXY` | No | HTTP proxy for Telegram API (if needed) |
 | `PORT` | No | HTTP port (default: `10000`) |
 | `RESTART_ON_CRASH` | No | Restart polling after errors (default: `true`) |

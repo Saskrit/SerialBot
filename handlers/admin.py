@@ -870,6 +870,20 @@ async def admin_referrals_list(callback: CallbackQuery):
     await _send_referrals_page(callback, page)
 
 
+@router.callback_query(F.data == "admin:notifypromo")
+async def admin_notify_promo(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+    from services.notify_promo import send_notify_membership_promo
+
+    await callback.answer("Sending promo…")
+    sent, total = await send_notify_membership_promo(callback.bot)
+    await callback.message.answer(
+        f"🔔 Alert membership promo sent to {sent}/{total} users.",
+    )
+
+
 @router.callback_query(F.data == "admin:stats")
 async def admin_stats(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):

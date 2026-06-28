@@ -16,7 +16,7 @@ from services.membership import (
     WEEKLY_VIP,
 )
 from services.messages import format_date, format_month_year
-from services.payment_contact import payment_contact_label, payment_contact_url
+from services.notify_membership import NOTIFY_PLANS
 from services.serial_matcher import search_serials
 from services.settings import format_free_limit_label, get_free_daily_limit
 from web.templates import render_template
@@ -175,6 +175,7 @@ async def plan_page(request: web.Request) -> web.Response:
         pay_per_use_plans=[EPISODE_PASS, DAILY_PASS],
         vip_plans=[WEEKLY_VIP, MONTHLY_VIP, QUARTERLY_VIP, ANNUAL_VIP],
         vip_privileges=VIP_PRIVILEGES,
+        notify_plans=NOTIFY_PLANS,
     )
 
 

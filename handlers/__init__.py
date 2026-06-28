@@ -1,6 +1,6 @@
 from aiogram import Router
 
-from . import admin, browse, episodes, errors, payment, plan, refer, request, search, start, support, ui
+from . import admin, browse, episodes, errors, notify, payment, plan, refer, request, search, start, support, ui
 
 
 def setup_routers() -> Router:
@@ -10,6 +10,7 @@ def setup_routers() -> Router:
     root.include_router(ui.router)
     root.include_router(plan.router)
     root.include_router(refer.router)
+    root.include_router(notify.router)
     root.include_router(browse.router)
     root.include_router(payment.router)
     root.include_router(request.router)

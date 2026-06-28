@@ -17,6 +17,7 @@ BOT_MENU_BUTTONS = frozenset(
         "📺 Request Episode",
         "💬 Support",
         "🎁 Refer & Watch",
+        "🔔 Episode Alerts",
         "❌ Close Menu",
     }
 )
