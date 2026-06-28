@@ -5,8 +5,6 @@ from urllib.parse import quote
 from aiohttp import web
 from bson import ObjectId
 
-import aiohttp
-
 from database import repository as repo
 from database.connection import get_db
 from config import NOTIFY_PROMO_INTERVAL_HOURS
@@ -123,9 +121,6 @@ async def dashboard(request: web.Request) -> web.Response:
     total_views = await repo.get_total_episode_views()
     free_limit = await get_free_daily_limit()
     trial_ttl = await get_trial_episode_ttl_seconds()
-    pending = await get_db().payments.count_documents(
-        {"status": "pending", "screenshot_file_id": {"$ne": None}}
-    )
     open_requests = await get_db().episode_requests.count_documents({"status": "open"})
     open_tickets = await get_db().support_tickets.count_documents({"status": "open"})
     referral_count = await repo.count_referrals()
@@ -140,7 +135,6 @@ async def dashboard(request: web.Request) -> web.Response:
         referral_count=referral_count,
         free_limit_label=format_free_limit_label(free_limit),
         trial_ttl_label=format_trial_ttl_label(trial_ttl),
-        pending=pending,
         open_requests=open_requests,
         open_tickets=open_tickets,
         format_date=format_date,
@@ -393,75 +387,6 @@ async def user_grant_unlock(request: web.Request) -> web.Response:
             _redirect(f"/admin/users/{telegram_id}", "Episode not found.")
         await repo.grant_episode_unlock(telegram_id, episode_id)
         _redirect(f"/admin/users/{telegram_id}", "Episode unlock granted.")
-
-    return await _post_action(request, action)
-
-
-@require_admin
-async def payments_list(request: web.Request) -> web.Response:
-    payments = await repo.get_pending_payments(50)
-    return _html(
-        "payments.html",
-        request,
-        flash=_flash_from_query(request),
-        payments=payments,
-        format_datetime=format_datetime,
-    )
-
-
-@require_admin
-async def payment_screenshot(request: web.Request) -> web.Response:
-    payment_id = request.match_info["payment_id"]
-    payment = await repo.get_payment(payment_id)
-    if not payment or not payment.get("screenshot_file_id"):
-        raise web.HTTPNotFound()
-
-    bot = _create_bot(request)
-    try:
-        url = await admin_actions.get_telegram_file_url(bot, payment["screenshot_file_id"])
-    finally:
-        await bot.session.close()
-
-    if not url:
-        raise web.HTTPNotFound(text="Screenshot unavailable")
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            if resp.status != 200:
-                raise web.HTTPNotFound(text="Screenshot unavailable")
-            body = await resp.read()
-            content_type = resp.headers.get("Content-Type", "image/jpeg")
-            return web.Response(body=body, content_type=content_type)
-
-
-@require_admin
-async def payment_approve(request: web.Request) -> web.Response:
-    async def action(req: web.Request) -> web.Response:
-        payment_id = req.match_info["payment_id"]
-        bot = _create_bot(req)
-        try:
-            ok, msg = await admin_actions.approve_payment(
-                bot, payment_id, req["admin_id"]
-            )
-        finally:
-            await bot.session.close()
-        _redirect("/admin/payments", msg if ok else f"Error: {msg}")
-
-    return await _post_action(request, action)
-
-
-@require_admin
-async def payment_reject(request: web.Request) -> web.Response:
-    async def action(req: web.Request) -> web.Response:
-        payment_id = req.match_info["payment_id"]
-        bot = _create_bot(req)
-        try:
-            ok, msg = await admin_actions.reject_payment(
-                bot, payment_id, req["admin_id"]
-            )
-        finally:
-            await bot.session.close()
-        _redirect("/admin/payments", msg if ok else f"Error: {msg}")
 
     return await _post_action(request, action)
 
@@ -928,10 +853,6 @@ def setup_admin_routes(app: web.Application, create_bot) -> None:
     app.router.add_post("/admin/users/{telegram_id:\\d+}/revoke-notify", user_revoke_notify)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/unlock", user_grant_unlock)
     app.router.add_post("/admin/users/{telegram_id:\\d+}/delete", user_delete)
-    app.router.add_get("/admin/payments", payments_list)
-    app.router.add_get("/admin/payments/{payment_id}/screenshot", payment_screenshot)
-    app.router.add_post("/admin/payments/{payment_id}/approve", payment_approve)
-    app.router.add_post("/admin/payments/{payment_id}/reject", payment_reject)
     app.router.add_get("/admin/serials", serials_list)
     app.router.add_get("/admin/serials/new", serial_new_page)
     app.router.add_post("/admin/serials/new", serial_create)

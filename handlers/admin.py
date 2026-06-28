@@ -913,9 +913,6 @@ async def admin_stats(callback: CallbackQuery):
     stats = await repo.get_user_stats()
     episode_count = await get_db().episodes.count_documents({})
     total_views = await repo.get_total_episode_views()
-    pending = await get_db().payments.count_documents(
-        {"status": "pending", "screenshot_file_id": {"$ne": None}}
-    )
     free_limit = await get_free_daily_limit()
     trial_ttl = await get_trial_episode_ttl_seconds()
 
@@ -927,7 +924,6 @@ async def admin_stats(callback: CallbackQuery):
         f"Banned: <b>{stats['banned']}</b>\n"
         f"Episodes: <b>{episode_count}</b>\n"
         f"Total episode views: <b>{total_views}</b>\n"
-        f"Pending payments: <b>{pending}</b>\n"
         f"Referral invites: <b>{await repo.count_referrals()}</b>\n"
         f"Free tier limit: <b>{format_free_limit_label(free_limit)}</b>\n"
         f"Trial episode timer: <b>{format_trial_ttl_label(trial_ttl)}</b>"
@@ -1102,80 +1098,6 @@ async def set_trial_ttl_cmd(message: Message):
         f"✅ Trial timer set to <b>{format_trial_ttl_label(seconds)}</b>.",
         parse_mode="HTML",
     )
-
-
-@router.callback_query(F.data == "admin:payments")
-async def admin_payments(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Unauthorized.", show_alert=True)
-        return
-
-    payments = await repo.get_pending_payments(10)
-    if not payments:
-        await callback.message.answer("No pending payments.")
-        await callback.answer()
-        return
-
-    from keyboards.inline import admin_payment_keyboard
-
-    for payment in payments:
-        pid = str(payment["_id"])
-        text = (
-            f"💳 Payment <code>{pid}</code>\n"
-            f"User: <code>{payment['user_id']}</code>\n"
-            f"Type: {payment['type']} · ₹{payment['amount']}"
-        )
-        if payment.get("screenshot_file_id"):
-            await callback.bot.send_photo(
-                callback.from_user.id,
-                photo=payment["screenshot_file_id"],
-                caption=text,
-                reply_markup=admin_payment_keyboard(pid),
-                parse_mode="HTML",
-            )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("admin:pay:ok:"))
-async def approve_payment(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Unauthorized.", show_alert=True)
-        return
-
-    payment_id = callback.data.split(":", 3)[3]
-    ok, msg = await admin_actions.approve_payment(
-        callback.bot, payment_id, callback.from_user.id
-    )
-    if not ok:
-        await callback.answer(msg, show_alert=True)
-        return
-
-    await callback.message.edit_caption(
-        (callback.message.caption or "") + "\n\n✅ Approved",
-        parse_mode="HTML",
-    )
-    await callback.answer("Approved ✅")
-
-
-@router.callback_query(F.data.startswith("admin:pay:no:"))
-async def reject_payment(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Unauthorized.", show_alert=True)
-        return
-
-    payment_id = callback.data.split(":", 3)[3]
-    ok, msg = await admin_actions.reject_payment(
-        callback.bot, payment_id, callback.from_user.id
-    )
-    if not ok:
-        await callback.answer(msg, show_alert=True)
-        return
-
-    await callback.message.edit_caption(
-        (callback.message.caption or "") + "\n\n❌ Rejected",
-        parse_mode="HTML",
-    )
-    await callback.answer("Rejected")
 
 
 @router.callback_query(F.data == "admin:broadcast")

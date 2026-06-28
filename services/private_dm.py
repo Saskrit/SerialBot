@@ -16,10 +16,6 @@ async def get_bot_username(bot: Bot) -> str:
     return _bot_username
 
 
-def payment_deep_link(bot_username: str, payment_id: str) -> str:
-    return f"https://t.me/{bot_username}?start=pay_{payment_id}"
-
-
 def referral_deep_link(bot_username: str, telegram_id: int) -> str:
     return f"https://t.me/{bot_username}?start=ref_{telegram_id}"
 

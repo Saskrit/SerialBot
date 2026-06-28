@@ -61,8 +61,6 @@ STORAGE_CHANNEL_ID = next(iter(STORAGE_CHANNEL_IDS), None)
 def is_storage_channel(chat_id: int) -> bool:
     return chat_id in STORAGE_CHANNEL_IDS
 
-UPI_ID = os.getenv("UPI_ID", "serialhub@upi")
-PAYMENT_NAME = os.getenv("PAYMENT_NAME", "Serial Hub")
 PAYMENT_CONTACT_USERNAME = os.getenv("PAYMENT_CONTACT_USERNAME", "godthough")
 
 FREE_DAILY_LIMIT = 3
@@ -105,7 +103,7 @@ def validate_config() -> None:
         import logging
 
         logging.getLogger(__name__).warning(
-            "ADMIN_IDS is not set. Admin panel and payment review will not work."
+            "ADMIN_IDS is not set. Admin panel will not work."
         )
     if not ADMIN_SECRET:
         import logging

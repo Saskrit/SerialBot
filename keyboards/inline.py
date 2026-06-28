@@ -519,7 +519,6 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="👥 All Users", callback_data="admin:users:0")],
         [InlineKeyboardButton(text="🎁 Referrals", callback_data="admin:referrals:0")],
         [InlineKeyboardButton(text="🔔 Alert promo", callback_data="admin:notifypromo")],
-        [InlineKeyboardButton(text="💳 Pending Payments", callback_data="admin:payments")],
         [InlineKeyboardButton(text="⚙️ Free Tier Limit", callback_data="admin:freelimit")],
         [InlineKeyboardButton(text="⏳ Trial Episode Timer", callback_data="admin:trial")],
         [InlineKeyboardButton(text="📺 Episode Requests", callback_data="admin:requests")],
@@ -629,17 +628,6 @@ def admin_referrals_keyboard(page: int, total_pages: int) -> InlineKeyboardMarku
     rows.append([InlineKeyboardButton(text="🛠 Admin Menu", callback_data="admin:menu")])
     append_ui_actions(rows, include_home=False)
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def admin_payment_keyboard(payment_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Approve", callback_data=f"admin:pay:ok:{payment_id}"),
-                InlineKeyboardButton(text="❌ Reject", callback_data=f"admin:pay:no:{payment_id}"),
-            ]
-        ]
-    )
 
 
 def admin_user_keyboard(telegram_id: int) -> InlineKeyboardMarkup:

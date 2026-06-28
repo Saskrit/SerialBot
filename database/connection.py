@@ -32,7 +32,6 @@ async def init_db() -> AsyncIOMotorDatabase:
     await db.users.create_index("telegram_id", unique=True)
     await db.serials.create_index("slug", unique=True)
     await db.episodes.create_index([("serial_slug", 1), ("date", -1)])
-    await db.payments.create_index([("status", 1), ("created_at", -1)])
     await db.episode_requests.create_index([("status", 1), ("created_at", -1)])
     await db.support_tickets.create_index([("status", 1), ("created_at", -1)])
     await db.trial_deletions.create_index("delete_at")

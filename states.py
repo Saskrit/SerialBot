@@ -1,10 +1,6 @@
 from aiogram.fsm.state import State, StatesGroup
 
 
-class PaymentStates(StatesGroup):
-    waiting_screenshot = State()
-
-
 class EpisodeRequestStates(StatesGroup):
     waiting_serial = State()
     waiting_date = State()

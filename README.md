@@ -29,7 +29,6 @@ Telegram bot and web app for browsing and delivering daily TV serial episodes. U
 - User management (ban, VIP, unlock)
 - **Referrals** — see who invited whom (name, username, Telegram ID)
 - Settings (free daily limit, trial timer)
-- Payment review (legacy pending screenshots)
 - Episode requests, support replies, broadcast messages
 
 ## Tech stack
@@ -136,7 +135,7 @@ Payments are completed via Telegram contact (`PAYMENT_CONTACT_USERNAME`). Plan d
 
 ## Payments
 
-VIP upgrades and episode unlocks are handled by contacting the configured Telegram user (`PAYMENT_CONTACT_USERNAME`). Users message that account from the bot; admins grant VIP or unlocks from `/admin`.
+VIP upgrades, episode unlocks, and alert membership are handled by contacting `PAYMENT_CONTACT_USERNAME` on Telegram. Admins grant access from the user detail page in the admin panel.
 
 ## Project structure
 
